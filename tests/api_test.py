@@ -131,4 +131,26 @@ teacher.call('workspace',expected=401)
 assert other.call('workspace')['data']==private
 other.call('password',{'current_password':'Changed-test-123456','password':'Another-test-123456'})
 other.call('logout',{});other.call('workspace',expected=401)
+# Withdrawal is admin-only, reversible, versioned, and preserves teacher copies.
+third_library=third.call('library')
+source=next(c for c in third_library['coreos'] if c['id']=='coreo2')
+third_private={**empty,'coreos':[{**source,'id':'thirdcopy','libraryId':'coreo2'}]}
+third.call('workspace',{'version':0,'data':third_private})
+third.call('library-ignore',{'ids':['coreo2']})
+current=admin.call('library')
+third.call('library-unpublish',{'version':current['version'],'ids':['coreo2']},expected=403)
+admin.call('library-unpublish',{'version':current['version'],'ids':['coreo2']},csrf='bad',expected=403)
+admin.call('library-unpublish',{'version':current['version'],'ids':['coreo2']})
+assert not any(c['id']=='coreo2' for c in third.call('library')['coreos'])
+assert next(c for c in admin.call('library')['coreos'] if c['id']=='coreo2')['published'] is False
+assert third.call('workspace')['data']==third_private
+admin.call('library-unpublish',{'version':current['version'],'ids':['coreo1']},expected=409)
+current=admin.call('library')
+admin.call('library',{'version':current['version'],'coreos':[coreo]})
+assert next(c for c in admin.call('library')['coreos'] if c['id']=='coreo2')['published'] is False
+current=admin.call('library')
+admin.call('library',{'version':current['version'],'coreos':[source]})
+assert next(c for c in third.call('library')['coreos'] if c['id']=='coreo2')['published'] is True
+assert 'coreo2' in third.call('library')['unseenIds']
+assert third.call('workspace')['data']==third_private
 print('API: cuentas, invitaciones de un uso, permisos, aislamiento, catálogo común, copias privadas, conflictos, validación, CSRF, recuperación y cierre correctos.')

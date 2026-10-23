@@ -36,3 +36,8 @@ Chrome real con API simulada: edición de la ficha pública antes de confirmar, 
 ## Plantilla de invitación (23 de octubre de 2026)
 
 Vista previa HTML comprobada en Chrome a 800 y 390 píxeles, con botón de activación y sin desbordamiento horizontal. Se ha preparado `tests/email_test.php` para comprobar las partes de texto y HTML, los enlaces, el escape del nombre y los delimitadores MIME sin enviar mensajes. No ejecutada por falta de PHP en el entorno. Pendiente comprobar el mensaje recibido en clientes de correo reales; no se han enviado correos desde esta sesión.
+
+
+## Gestión visual y retirada del catálogo (23 de octubre de 2026)
+
+Chrome con API simulada (`tests/catalog_manager_test.cjs`): vista completa, filtros, selección, cancelación sin escritura, retirada por lotes, republicación de una ficha externa, publicación múltiple y ausencia de desbordamiento en móvil y escritorio. Revisada captura móvil. La prueba anterior de avisos, estados, propuestas y acciones por rol sigue pasando. Las pruebas de API se amplían con retirada exclusiva de admin, CSRF, conflictos de versión, conservación de copias privadas y nuevo aviso tras republicar; pendientes de ejecución por falta de PHP en el entorno. Sigue pendiente la integración PHP/MySQL en hosting.

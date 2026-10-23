@@ -317,3 +317,14 @@ La recuperación de contraseña conserva su mensaje específico. El remitente si
 Para instalar esta plantilla, sube de `dist/clases/` a sus mismas rutas en el hosting: `api/index.php`, **`api/email.php`**, **`api/email-invitation.html`**, `api/.htaccess`, `index.html` y `sw.js`. Conserva el ajuste de `$configPath` en `api/index.php`. No requiere SQL ni cambios en `compas-config.php`. Los archivos de plantilla se incluyen en el paquete completo y el de catálogo, pero no en el ZIP de interfaz.
 
 La prueba `php tests/email_test.php` construye y comprueba el mensaje MIME sin enviar correos. Comprueba el resultado final con una nueva invitación en un buzón real tras actualizar el hosting.
+
+
+## Gestión visual del catálogo común
+
+**Administración → Catálogo común** abre una pantalla completa con tarjetas compactas, contador de publicadas y sin publicar, búsqueda por nombre o autor y filtros **Todas**, **Publicadas**, **Sin publicar** y **Retiradas**. Incluye tanto las fichas del catálogo común (también las propuestas aprobadas de profesores) como las fichas privadas del administrador disponibles para publicar. Las fichas ya presentes se agrupan por identificador de origen para no duplicarlas.
+
+Cada tarjeta permite **Publicar** o **Despublicar**. Se pueden seleccionar varias, usar **Marcar visibles** / **Desmarcar todas** y aplicar **Publicar selección** o **Despublicar selección**. La publicación por lotes solo afecta a las seleccionadas sin publicar, y la retirada solo a las publicadas. Antes de guardar se muestra una confirmación con la lista de fichas afectadas. **Actualizar** recarga el catálogo; si otra sesión lo ha cambiado, se rechaza el guardado antiguo para evitar sobrescribir cambios.
+
+Despublicar conserva la ficha archivada para que el administrador pueda volver a publicarla. Los profesores dejan de verla en el catálogo y sus avisos, pero conservan sus copias privadas y sus clases. Volver a publicarla mantiene su identificador y genera un aviso nuevo; no actualiza automáticamente las copias que ya tienen los profesores. Publicar otras fichas no reactiva las retiradas.
+
+No requiere migración SQL: el estado se almacena dentro del catálogo existente. Las fichas antiguas se consideran publicadas. Para actualizar, sube de `dist/clases/`: `api/index.php`, `api/lib.php`, `app.js`, `cloud.js`, `cloud.css`, `index.html` y `sw.js`. Conserva el ajuste de `$configPath` en `api/index.php` si lo tienes personalizado.

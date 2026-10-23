@@ -81,7 +81,7 @@ try {
         $u=query('SELECT * FROM compas_users WHERE id=?',[$u['id']])->fetch(); loginUser($u); reply(['csrf'=>$_SESSION['csrf'],'ok'=>true]);
     }
     if ($action==='library' && $method==='GET') {
-        $library=libraryData();
+        $library=libraryData($u['role']==='admin');
         reply($library+['unseenIds'=>unseenLibraryIds($u['id'],$library['coreos'])]);
     }
     if ($action==='notifications' && $method==='GET') {
@@ -169,10 +169,11 @@ try {
                 if (!trim($coreo['name']) || !trim($coreo['level'])) fail('Indica el nombre y el nivel de la coreografía.');
             }
             $reviewed=sharedCoreo($coreo);
-            $library=libraryData();
-            foreach ($library['coreos'] as $existing) if (preg_replace('/\s+/u',' ',trim($existing['name'])) === preg_replace('/\s+/u',' ',trim($coreo['name'])) || strcasecmp(trim($existing['name']),trim($coreo['name']))===0) { $pdo->rollBack(); fail('Ya existe una coreografía con ese nombre en el catálogo común. Puedes descartar la propuesta.',409); }
+            $library=libraryData(true);
+            foreach ($library['coreos'] as $existing) if (($existing['published'] ?? true)!==false && (preg_replace('/\s+/u',' ',trim($existing['name'])) === preg_replace('/\s+/u',' ',trim($coreo['name'])) || strcasecmp(trim($existing['name']),trim($coreo['name']))===0)) { $pdo->rollBack(); fail('Ya existe una coreografía con ese nombre en el catálogo común. Puedes descartar la propuesta.',409); }
             $coreo['id']='suggestion_'.$id;
             $coreo['publicationVersion']=$library['version']+1;
+            $coreo['published']=true;
             $library['coreos'][]=$coreo;
             validateWorkspace(['centers'=>[],'groups'=>[],'sessions'=>[],'coreos'=>$library['coreos']]);
             $saved=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($library['coreos'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$library['version']]);
@@ -187,11 +188,11 @@ try {
         $data=validateWorkspace(['centers'=>[], 'groups'=>[], 'sessions'=>[], 'coreos'=>$body['coreos'] ?? null]);
         // Publication is additive: omitted routines must remain in the shared catalog.
         $pdo->beginTransaction();
-        $library=libraryData();
+        $library=libraryData(true);
         if ($library['version']!==$body['version']) fail('El catálogo común ha cambiado. Ciérralo y vuelve a abrirlo.',409);
         $merged=[];
         foreach ($library['coreos'] as $coreo) $merged[$coreo['id']]=$coreo;
-        foreach ($data['coreos'] as $coreo) $merged[$coreo['id']]=sharedCoreo($coreo)+['publicationVersion'=>$library['version']+1];
+        foreach ($data['coreos'] as $coreo) $merged[$coreo['id']]=sharedCoreo($coreo)+['publicationVersion'=>$library['version']+1,'published'=>true];
         $coreos=array_values($merged);
         validateWorkspace(['centers'=>[], 'groups'=>[], 'sessions'=>[], 'coreos'=>$coreos]);
         $changed=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($coreos,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$body['version']]);
@@ -199,6 +200,22 @@ try {
         // Only teachers need receipts; publishing is independent of notification preferences.
         $pdo->commit();
         reply(['version'=>$body['version']+1]);
+    }
+
+    if ($action==='library-unpublish' && $method==='POST') {
+        $ids=$body['ids'] ?? null;
+        if (!isset($body['version']) || !is_int($body['version']) || !is_array($ids) || !array_is_list($ids) || !$ids || count($ids)>20000) fail('Selección no válida.');
+        foreach ($ids as $id) if (!is_string($id) || !preg_match('/^[a-zA-Z0-9_-]{1,100}$/D',$id)) fail('Identificador no válido.');
+        $pdo->beginTransaction();
+        $library=libraryData(true);
+        if ($library['version']!==$body['version']) { $pdo->rollBack(); fail('El catálogo ha cambiado. Recarga la gestión antes de continuar.',409); }
+        $selected=array_fill_keys($ids,true); $withdrawn=0;
+        foreach ($library['coreos'] as &$coreo) if (isset($selected[$coreo['id']]) && ($coreo['published'] ?? true)!==false) { $coreo['published']=false; $withdrawn++; }
+        unset($coreo);
+        if (!$withdrawn) { $pdo->rollBack(); fail('No hay coreografías publicadas en la selección.',409); }
+        $changed=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($library['coreos'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$library['version']]);
+        if ($changed->rowCount()!==1) { $pdo->rollBack(); fail('El catálogo ha cambiado. Recarga la gestión antes de continuar.',409); }
+        $pdo->commit();reply(['version'=>$library['version']+1,'withdrawn'=>$withdrawn]);
     }
 
     if ($action==='teacher-workspace' && $method==='GET') {
