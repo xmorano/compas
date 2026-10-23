@@ -102,3 +102,15 @@ function createUser(string $email, string $name, string $password, string $role)
     query('INSERT INTO compas_workspaces (user_id,payload,version,updated_at) VALUES (?,?,0,?)',[$id,json_encode(emptyWorkspace()),time()]);
     return query('SELECT * FROM compas_users WHERE id=?',[$id])->fetch();
 }
+
+function libraryData(): array {
+    $row=query('SELECT payload,version FROM compas_library WHERE id=1')->fetch();
+    return ['coreos'=>json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR),'version'=>(int)$row['version']];
+}
+function unseenLibraryIds(string $userId, array $coreos): array {
+    $seen=array_fill_keys(query('SELECT coreo_id FROM compas_library_seen WHERE user_id=?',[$userId])->fetchAll(PDO::FETCH_COLUMN),true);
+    return array_values(array_map(fn($c)=>$c['id'],array_filter($coreos,fn($c)=>!isset($seen[$c['id']]))));
+}
+function sharedCoreo(array $coreo): array {
+    return array_intersect_key($coreo,array_flip(['id','name','author','level','walls','counts','music','video','sheet','extras']));
+}

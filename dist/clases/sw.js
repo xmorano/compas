@@ -1,6 +1,6 @@
 // Generated version changes whenever a bundled public asset changes.
 const CACHE_PREFIX='compas-pwa-'+new URL(self.registration.scope).pathname+'-';
-const CACHE_NAME=CACHE_PREFIX+'928acadd69c12f7f';
+const CACHE_NAME=CACHE_PREFIX+'28d1a219cb430e25';
 const ASSETS=["app.js", "cloud.css", "cloud.js", "csv.js", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/icon.svg", "manifest.webmanifest", "offline.html", "previous-class.js", "pwa.js", "rich-extras.js", "style.css", "whatsapp.js"];
 const urls=new Set(ASSETS.map(path=>new URL(path,self.registration.scope).href));
 const offlineUrl=new URL('offline.html',self.registration.scope).href;

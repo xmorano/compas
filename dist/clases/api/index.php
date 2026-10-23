@@ -81,30 +81,114 @@ try {
         $u=query('SELECT * FROM compas_users WHERE id=?',[$u['id']])->fetch(); loginUser($u); reply(['csrf'=>$_SESSION['csrf'],'ok'=>true]);
     }
     if ($action==='library' && $method==='GET') {
-        $row=query('SELECT payload,version FROM compas_library WHERE id=1')->fetch();
-        reply(['coreos'=>json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR),'version'=>(int)$row['version']]);
+        $library=libraryData();
+        reply($library+['unseenIds'=>unseenLibraryIds($u['id'],$library['coreos'])]);
+    }
+    if ($action==='notifications' && $method==='GET') {
+        $library=libraryData();
+        $pending=$u['role']==='admin' ? (int)query("SELECT COUNT(*) FROM compas_suggestions WHERE status='pending'")->fetchColumn() : 0;
+        reply(['newCoreos'=>count(unseenLibraryIds($u['id'],$library['coreos'])),'pendingSuggestions'=>$pending]);
+    }
+    if ($action==='library-seen' && $method==='POST') {
+        $ids=$body['ids'] ?? null;
+        if (!is_array($ids) || !array_is_list($ids) || count($ids)>20000) fail('Lista no válida.');
+        foreach ($ids as $id) if (!is_string($id) || !preg_match('/^[a-zA-Z0-9_-]{1,100}$/D',$id)) fail('Identificador no válido.');
+        $available=array_fill_keys(array_column(libraryData()['coreos'],'id'),true);
+        $pdo->beginTransaction();
+        foreach (array_unique($ids) as $id) if (isset($available[$id])) {
+            $sql=$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql' ? 'INSERT IGNORE INTO compas_library_seen (user_id,coreo_id) VALUES (?,?)' : 'INSERT OR IGNORE INTO compas_library_seen (user_id,coreo_id) VALUES (?,?)';
+            query($sql,[$u['id'],$id]);
+        }
+        $pdo->commit(); reply(['ok'=>true]);
+    }
+    if ($action==='suggestions' && $method==='GET') {
+        $where=$u['role']==='admin' ? '' : ' WHERE s.user_id=?';
+        $rows=query('SELECT s.*,u.name AS teacher_name,u.email AS teacher_email FROM compas_suggestions s JOIN compas_users u ON u.id=s.user_id'.$where.' ORDER BY s.created_at DESC,s.id', $u['role']==='admin' ? [] : [$u['id']])->fetchAll();
+        foreach ($rows as &$row) { $row['coreo']=json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR); unset($row['payload']); }
+        unset($row); reply(['suggestions'=>$rows]);
+    }
+    if ($action==='suggestions' && $method==='POST') {
+        if ($u['role']==='admin') fail('Puedes publicar directamente desde tu catálogo.',403);
+        rateLimit('suggestions',60);
+        $source=textField($body,'source_id',100);
+        $pdo->beginTransaction();
+        query('UPDATE compas_meta SET lock_version=lock_version+1 WHERE id=1');
+        if (query('SELECT id FROM compas_suggestions WHERE user_id=? AND source_id=?',[$u['id'],$source])->fetchColumn()) { $pdo->rollBack(); fail('Ya has propuesto esta coreografía. Consulta su estado en Mis propuestas.',409); }
+        $workspace=json_decode(query('SELECT payload FROM compas_workspaces WHERE user_id=?',[$u['id']])->fetchColumn(),true,64,JSON_THROW_ON_ERROR);
+        $matches=array_values(array_filter($workspace['coreos'],fn($c)=>$c['id']===$source));
+        if (!$matches) { $pdo->rollBack(); fail('La coreografía no está guardada en tu catálogo.',404); }
+        $coreo=sharedCoreo($matches[0]);
+        $id=bin2hex(random_bytes(16));
+        query("INSERT INTO compas_suggestions (id,user_id,source_id,payload,status,created_at) VALUES (?,?,?,?,'pending',?)",[$id,$u['id'],$source,json_encode($coreo,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time()]);
+        $pdo->commit(); reply(['id'=>$id]);
     }
     if ($u['role']!=='admin') fail('No tienes permiso para esta operación.',403);
+    if ($action==='review-suggestion' && $method==='POST') {
+        $id=textField($body,'id',32); $decision=textField($body,'decision',10);
+        if (!in_array($decision,['accepted','rejected'],true)) fail('Decisión no válida.');
+        $pdo->beginTransaction();
+        $changed=query("UPDATE compas_suggestions SET status=?,reviewed_at=? WHERE id=? AND status='pending'",[$decision,time(),$id]);
+        if ($changed->rowCount()!==1) { $pdo->rollBack(); fail('La propuesta ya ha sido revisada o no existe.',409); }
+        if ($decision==='accepted') {
+            $suggestion=query('SELECT payload FROM compas_suggestions WHERE id=?',[$id])->fetchColumn();
+            $coreo=json_decode($suggestion,true,64,JSON_THROW_ON_ERROR);
+            $library=libraryData();
+            foreach ($library['coreos'] as $existing) if (preg_replace('/\s+/u',' ',trim($existing['name'])) === preg_replace('/\s+/u',' ',trim($coreo['name'])) || strcasecmp(trim($existing['name']),trim($coreo['name']))===0) { $pdo->rollBack(); fail('Ya existe una coreografía con ese nombre en el catálogo común. Puedes descartar la propuesta.',409); }
+            $coreo['id']='suggestion_'.$id;
+            $library['coreos'][]=$coreo;
+            validateWorkspace(['centers'=>[],'groups'=>[],'sessions'=>[],'coreos'=>$library['coreos']]);
+            $saved=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($library['coreos'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$library['version']]);
+            if ($saved->rowCount()!==1) { $pdo->rollBack(); fail('El catálogo ha cambiado. Vuelve a revisar la propuesta.',409); }
+        }
+        $pdo->commit(); reply(['ok'=>true]);
+    }
     if ($action==='library' && $method==='POST') {
         if (!isset($body['version']) || !is_int($body['version'])) fail('Versión no válida.');
         $data=validateWorkspace(['centers'=>[], 'groups'=>[], 'sessions'=>[], 'coreos'=>$body['coreos'] ?? null]);
-        $coreos=array_map(fn($c)=>array_intersect_key($c,array_flip(['id','name','author','level','walls','counts','music','video','sheet','extras'])), $data['coreos']);
+        // Publication is additive: omitted routines must remain in the shared catalog.
+        $library=libraryData();
+        if ($library['version']!==$body['version']) fail('El catálogo común ha cambiado. Ciérralo y vuelve a abrirlo.',409);
+        $merged=[];
+        foreach ($library['coreos'] as $coreo) $merged[$coreo['id']]=$coreo;
+        foreach ($data['coreos'] as $coreo) $merged[$coreo['id']]=sharedCoreo($coreo);
+        $coreos=array_values($merged);
+        validateWorkspace(['centers'=>[], 'groups'=>[], 'sessions'=>[], 'coreos'=>$coreos]);
         $changed=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($coreos,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$body['version']]);
         if ($changed->rowCount()!==1) fail('El catálogo común ha cambiado. Ciérralo y vuelve a abrirlo.',409);
         reply(['version'=>$body['version']+1]);
     }
 
+    if ($action==='teacher-workspace' && $method==='GET') {
+        $id=$_GET['user_id'] ?? '';
+        if (!is_string($id) || !preg_match('/^[a-f0-9]{32}$/D',$id)) fail('Profesor no válido.');
+        $teacher=query('SELECT id,email,name,role FROM compas_users WHERE id=?',[$id])->fetch();
+        if (!$teacher) fail('Profesor no encontrado.',404);
+        $row=query('SELECT payload,updated_at FROM compas_workspaces WHERE user_id=?',[$id])->fetch();
+        reply(['user'=>$teacher,'data'=>json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR),'updatedAt'=>(int)$row['updated_at']]);
+    }
+
     if ($action==='users' && $method==='GET') reply(['users'=>query('SELECT id,email,name,role,created_at FROM compas_users ORDER BY created_at')->fetchAll()]);
     if ($action==='invite' && $method==='POST') {
         rateLimit('invite',30); $email=emailField($body); $kind=textField($body,'kind',10);
+        $name=textField($body,'name',120);
+        if ($kind==='invite' && !$name) fail('Indica el nombre del profesor.');
         if (!in_array($kind,['invite','reset'],true)) fail('Tipo de enlace no válido.');
         $found=query('SELECT id FROM compas_users WHERE email=?',[$email])->fetch();
         if (($kind==='invite' && $found) || ($kind==='reset' && !$found)) fail('El correo no corresponde a esta operación.');
+        $from=$config['mail_from'] ?? '';
+        $appUrl=rtrim($config['app_url'] ?? '', '/');
+        if (!filter_var($from,FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n]/',$from) || !filter_var($appUrl,FILTER_VALIDATE_URL) || parse_url($appUrl,PHP_URL_SCHEME)!=='https' || strpbrk($appUrl,"\r\n?#")!==false) fail('Configura mail_from y app_url (HTTPS) en la configuración privada para enviar invitaciones.',503);
         $token=bin2hex(random_bytes(32));
         $pdo->beginTransaction();
         query('DELETE FROM compas_invites WHERE email=? OR expires_at<?',[$email,time()]);
         query('INSERT INTO compas_invites (token_hash,email,kind,expires_at) VALUES (?,?,?,?)',[hash('sha256',$token),$email,$kind,time()+172800]);
-        $pdo->commit(); reply(['token'=>$token,'expiresInHours'=>48]);
+        $pdo->commit();
+        $link=$appUrl.'/#acceso='.$token.'&nombre='.rawurlencode($name);
+        $greeting=$kind==='invite' ? 'Hola '.$name.',' : 'Hola,';
+        $message=$greeting."\n\n".($kind==='invite' ? 'Te han invitado a Compás. Abre este enlace para crear tu contraseña y entrar en tu espacio privado:' : 'Abre este enlace para crear una nueva contraseña de Compás:')."\n\n".$link."\n\nEl enlace caduca en 48 horas y solo puede usarse una vez.\n";
+        try { $sent=function_exists('mail') && mail($email,'Compas: acceso a tu cuenta',$message,['From'=>$from,'Content-Type'=>'text/plain; charset=UTF-8']); }
+        catch (Throwable $mailError) { error_log('Compas mail: '.$mailError->getMessage()); $sent=false; }
+        reply(['token'=>$token,'link'=>$link,'expiresInHours'=>48,'emailSent'=>$sent,'message'=>$sent ? 'El servidor de correo ha aceptado la invitación. Comprueba también la carpeta de spam.' : 'El servidor no ha aceptado el correo. Copia el enlace y compártelo en privado.']);
     }
     fail('Ruta no encontrada.',404);
 } catch (Throwable $e) {
