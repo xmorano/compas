@@ -76,6 +76,7 @@ async function cloudOpen(){
   }
   cloudStatus('● Guardado en tu cuenta');
   cloudEl('cloud-account').onclick=cloudAccount;
+  cloudConfigureNavigation();
   cloudStartNotifications();
   cloudEl('cloud-retry').onclick=()=>{
     if(cloudFailure && [409,401,403].includes(cloudFailure.status)){alert('Descarga primero tus cambios con el botón de copia y recarga la página.');return;}
@@ -88,7 +89,18 @@ async function cloudOpen(){
     else localStorage.removeItem(cloudCacheKey());
   }
 }
-function cloudAccount(){
+function cloudConfigureNavigation(){
+  cloudEl('cloud-admin')?.remove();
+  if(cloudUser.role!=='admin')return;
+  const button=document.createElement('button');
+  button.id='cloud-admin';button.type='button';
+  button.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 4v5c0 5-8 9-8 9s-8-4-8-9V7z"/><path d="m8 12 3 3 5-6"/></svg><span>Administración</span>';
+  button.onclick=cloudAdministration;
+  document.querySelector('aside nav').append(button);
+}
+function cloudAccount(){cloudSettings(false);}
+function cloudAdministration(){if(cloudUser.role==='admin')cloudSettings(true);}
+function cloudSettings(administration){
   const admin=cloudUser.role==='admin';
   const icon=path=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
   const icons={
@@ -99,29 +111,29 @@ function cloudAccount(){
     suggestions:icon('<path d="M21 11a8 8 0 0 1-8 8H7l-5 3 2-6a8 8 0 1 1 17-5Z"/><path d="M8 10h8m-8 4h5"/>')
   };
   const action=(id,key,title,description)=>`<button type="button" class="account-action" id="account-${id}"><span class="account-action-icon">${icons[key]}</span><span class="account-action-copy"><strong>${title}</strong><small>${description}</small></span><span class="account-action-arrow" aria-hidden="true">↗</span></button>`;
-  modal('Mi cuenta',`<div class="account-panel">
+  modal(administration?'Administración':'Mi cuenta',`<div class="account-panel">
     <section class="account-profile" aria-label="Tu perfil"><div class="account-avatar" aria-hidden="true">${cloudEscape([...cloudUser.name.trim()][0]?.toLocaleUpperCase('es')||'P')}</div><div class="account-identity"><span class="account-role">${admin?'Administrador':'Profesor'}</span><h3>${cloudEscape(cloudUser.name)}</h3><p>${cloudEscape(cloudUser.email)}</p></div><span class="account-profile-mark" aria-hidden="true">✧</span></section>
-    <section class="account-section" aria-labelledby="account-personal-title"><div class="account-section-heading"><h3 id="account-personal-title">Tu espacio</h3><p>Todo listo para seguir a tu ritmo.</p></div><div class="account-action-grid">
+    ${!administration?`<section class="account-section" aria-labelledby="account-personal-title"><div class="account-section-heading"><h3 id="account-personal-title">Tu espacio</h3><p>Todo listo para seguir a tu ritmo.</p></div><div class="account-action-grid">
       ${action('password','password','Contraseña','Actualiza tu acceso a Compás.')}
       ${action('import','import','Importar una copia','Recupera tus datos desde un archivo JSON.')}
       ${!admin?action('suggestions','suggestions','Propuestas al catálogo','Comparte una coreo y consulta tus propuestas.'):''}
-    </div></section>
-    ${admin?`<section class="account-section" aria-labelledby="account-admin-title"><div class="account-section-heading"><h3 id="account-admin-title">Administración</h3><p>Profesores y repertorio, en un mismo sitio.</p></div><div class="account-action-grid">
+    </div></section>`:''}
+    ${administration&&admin?`<section class="account-section" aria-labelledby="account-admin-title"><div class="account-section-heading"><h3 id="account-admin-title">Administración</h3><p>Profesores y repertorio, en un mismo sitio.</p></div><div class="account-action-grid">
       ${action('users','users','Profesores e invitaciones','Invita y consulta los espacios de los profesores.')}
       ${action('library','library','Catálogo común','Publica coreografías para todos los profesores.')}
       ${action('suggestions','suggestions','Propuestas de profesores','Revisa las coreos que quieren compartir.')}
     </div></section>`:''}
-    <div class="account-bottom"><button type="button" class="account-logout" id="account-logout">Cerrar sesión <span aria-hidden="true">↗</span></button><button type="button" class="button secondary" id="account-done">Volver a mi estudio</button></div>
+    <div class="account-bottom">${!administration?'<button type="button" class="account-logout" id="account-logout">Cerrar sesión <span aria-hidden="true">↗</span></button>':''}<button type="button" class="button secondary" id="account-done">Volver a mi estudio</button></div>
   </div>`,()=>{});
   document.querySelector('#form button[type="submit"]').hidden=false;
   document.getElementById('form').onsubmit=event=>event.preventDefault();
   cloudEl('account-done').onclick=()=>document.getElementById('modal').close();
-  cloudEl('account-import').onclick=()=>{document.getElementById('modal').close();cloudImport();};
-  cloudEl('account-password').onclick=()=>{document.getElementById('modal').close();cloudPassword();};
-  if(cloudUser.role==='admin')cloudEl('account-users').onclick=()=>{document.getElementById('modal').close();cloudInvites();};
-  if(cloudUser.role==='admin')cloudEl('account-library').onclick=()=>{document.getElementById('modal').close();cloudPublishLibrary();};
-  cloudEl('account-suggestions').onclick=()=>{document.getElementById('modal').close();cloudSuggestions();};
-  cloudEl('account-logout').onclick=async()=>{
+  if(!administration)cloudEl('account-import').onclick=()=>{document.getElementById('modal').close();cloudImport();};
+  if(!administration)cloudEl('account-password').onclick=()=>{document.getElementById('modal').close();cloudPassword();};
+  if(administration)cloudEl('account-users').onclick=()=>{document.getElementById('modal').close();cloudInvites();};
+  if(administration)cloudEl('account-library').onclick=()=>{document.getElementById('modal').close();cloudPublishLibrary();};
+  if(cloudEl('account-suggestions'))cloudEl('account-suggestions').onclick=()=>{document.getElementById('modal').close();cloudSuggestions();};
+  if(!administration)cloudEl('account-logout').onclick=async()=>{
     if(cloudPending||cloudBusy){alert('Hay cambios pendientes. Espera a que se guarden o descarga una copia antes de recargar y cerrar sesión.');return;}
     try{await cloudApi('logout',{});location.reload();}catch(error){toast(error.message);}
   };
