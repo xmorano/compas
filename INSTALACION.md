@@ -262,7 +262,7 @@ La publicación del catálogo común conserva en el servidor todas las fichas an
 
 ## Versión visible y registro de cambios
 
-La barra izquierda muestra debajo de la cuenta el hash corto del commit de código utilizado para generar la web. El hash completo figura al pasar el ratón. Para actualizarlo en el hosting, sube `index.html`, `cloud.css` y `sw.js` de `dist/clases/`. El push a GitHub no despliega automáticamente en HostGator.
+El pie de la barra izquierda muestra el hash corto del commit de código utilizado para generar la web. El hash completo figura al pasar el ratón. Para actualizarlo en el hosting, sube `index.html`, `cloud.css` y `sw.js` de `dist/clases/`. El push a GitHub no despliega automáticamente en HostGator.
 
 Cada cambio se registra con su motivo y se envía al remoto. Primero se hace commit del código, después se ejecuta `python3 tools/build.py` y se registran los paquetes en otro commit. La versión mostrada identifica el commit del código, no el de empaquetado, evitando una referencia circular. Una compilación con fuentes sin registrar añade el sufijo `-dev`.
 
