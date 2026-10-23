@@ -66,7 +66,10 @@ async function cloudOpen(){
   try{cached=JSON.parse(localStorage.getItem(cloudCacheKey()));}catch{}
   cloudEl('auth').hidden=true;
   document.querySelector('aside').hidden=false;document.querySelector('main').hidden=false;
-  document.querySelector('.profile span').textContent=cloudUser.name;
+  document.querySelector('.profile-name').textContent=cloudUser.name;
+  document.querySelector('.header-profile').title=cloudUser.name+' · '+cloudUser.email;
+  document.querySelector('.profile-role').textContent=cloudUser.role==='admin'?'Administrador':'Profesor';
+  document.querySelector('.header-profile b').textContent=[...cloudUser.name.trim()][0]?.toLocaleUpperCase('es')||'P';
   if(!window.COMPAS_LOADED){
     for(const src of ['whatsapp.js','previous-class.js','app.js','csv.js'])await cloudLoadScript(src);
     window.COMPAS_LOADED=true;
