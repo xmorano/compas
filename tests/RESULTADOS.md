@@ -31,3 +31,8 @@ Prueba en Chrome con API simulada superada: ignorar una novedad, ignorar las vis
 ## Estados y revisión de propuestas (23 de octubre de 2026)
 
 Chrome real con API simulada: edición de la ficha pública antes de confirmar, conservación de la ficha privada, comentario en el historial, rechazo del formulario de descarte sin motivo, visualización del motivo guardado y etiquetas de estado actualizadas. También siguen pasando los escenarios anteriores de avisos, ignorados, navegación por rol y publicación individual. Se han ampliado las pruebas de API para ficha corregida, comentarios y estados de propuestas pendientes, aceptadas y descartadas; no ejecutadas por falta de PHP en este entorno. Pendiente probar la migración y las transacciones con PHP/MySQL en hosting.
+
+
+## Plantilla de invitación (23 de octubre de 2026)
+
+Vista previa HTML comprobada en Chrome a 800 y 390 píxeles, con botón de activación y sin desbordamiento horizontal. Se ha preparado `tests/email_test.php` para comprobar las partes de texto y HTML, los enlaces, el escape del nombre y los delimitadores MIME sin enviar mensajes. No ejecutada por falta de PHP en el entorno. Pendiente comprobar el mensaje recibido en clientes de correo reales; no se han enviado correos desde esta sesión.

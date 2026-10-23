@@ -229,7 +229,17 @@ try {
         $link=$appUrl.'/#acceso='.$token.'&nombre='.rawurlencode($name);
         $greeting=$kind==='invite' ? 'Hola '.$name.',' : 'Hola,';
         $message=$greeting."\n\n".($kind==='invite' ? 'Te han invitado a Compás. Abre este enlace para crear tu contraseña y entrar en tu espacio privado:' : 'Abre este enlace para crear una nueva contraseña de Compás:')."\n\n".$link."\n\nEl enlace caduca en 48 horas y solo puede usarse una vez.\n";
-        try { $sent=function_exists('mail') && mail($email,'Compas: acceso a tu cuenta',$message,['From'=>$from,'Content-Type'=>'text/plain; charset=UTF-8']); }
+        try {
+            $subject='Compas: acceso a tu cuenta';
+            $headers=['From'=>$from,'Content-Type'=>'text/plain; charset=UTF-8'];
+            if ($kind==='invite') {
+                require_once __DIR__.'/email.php';
+                $invitation=compasInvitationEmail($name,$link,$appUrl);
+                $subject=$invitation['subject'];$message=$invitation['message'];
+                $headers=['From'=>$from]+$invitation['headers'];
+            }
+            $sent=function_exists('mail') && mail($email,$subject,$message,$headers);
+        }
         catch (Throwable $mailError) { error_log('Compas mail: '.$mailError->getMessage()); $sent=false; }
         reply(['token'=>$token,'link'=>$link,'expiresInHours'=>48,'emailSent'=>$sent,'message'=>$sent ? 'El servidor de correo ha aceptado la invitación. Comprueba también la carpeta de spam.' : 'El servidor no ha aceptado el correo. Copia el enlace y compártelo en privado.']);
     }

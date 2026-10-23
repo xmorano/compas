@@ -48,7 +48,7 @@ a=html.index('<script src=');html=html[:a]+'''<dialog id="pwa-help" aria-labelle
 for name in ['cloud.js','cloud.css']:
     shutil.copy2(ROOT/'server'/name,out/name)
 (out/'api').mkdir(exist_ok=True)
-for name in ['index.php','lib.php']:shutil.copy2(ROOT/'server'/name,out/'api'/name)
+for name in ['index.php','lib.php','email.php','email-invitation.html']:shutil.copy2(ROOT/'server'/name,out/'api'/name)
 (out/'.htaccess').write_text('''Options -Indexes
 <IfModule mod_mime.c>
 AddType application/manifest+json .webmanifest
@@ -65,7 +65,7 @@ Header always set Cache-Control "no-store"
 </IfModule>
 ''')
 # API helpers must not be called as independent entry points.
-(out/'api'/'.htaccess').write_text('<Files "lib.php">\nRequire all denied\n</Files>\n')
+(out/'api'/'.htaccess').write_text('<FilesMatch "^(lib\\.php|email\\.php|email-invitation\\.html)$">\nRequire all denied\n</FilesMatch>\n')
 for path in (ROOT/'server/pwa').rglob('*'):
     if path.is_file() and path.name != 'sw.js':
         target=out/path.relative_to(ROOT/'server/pwa');target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
@@ -93,6 +93,6 @@ with zipfile.ZipFile(ROOT/'dist'/'compas-catalogo-actualizacion.zip','w',zipfile
     z.write(ROOT/'server/migration-catalog.sql','migration-catalog.sql')
     z.write(ROOT/'server/migration-suggestion-reviews.sql','migration-suggestion-reviews.sql')
     z.write(ROOT/'server/migration-catalog-notices.sql','migration-catalog-notices.sql')
-    for name in ['index.html','style.css','assets/vadecountry-logo.png','app.js','cloud.js','cloud.css','sw.js','api/index.php','api/lib.php']:
+    for name in ['index.html','style.css','assets/vadecountry-logo.png','app.js','cloud.js','cloud.css','sw.js','api/index.php','api/lib.php','api/email.php','api/email-invitation.html','api/.htaccess']:
         z.write(out/name,'clases/'+name)
 print(ROOT/'dist'/'compas-catalogo-actualizacion.zip')

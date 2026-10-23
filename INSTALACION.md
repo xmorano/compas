@@ -306,3 +306,14 @@ En **Administración → Propuestas de profesores**, el administrador puede busc
 3. Recarga la web o acepta la actualización PWA. Comprueba una publicación corregida y un descarte con dos cuentas distintas.
 
 No subas el SQL a la carpeta pública. Para instalaciones nuevas, `schema.sql` ya contiene la tabla de revisiones. Los estados pueden consultarse sin esta tabla, pero la lista y revisión de propuestas requieren completar la migración.
+
+
+## Correo de bienvenida de Compás
+
+Las nuevas invitaciones usan el texto aprobado de bienvenida, con presentación de Compás, las funciones disponibles, botón para crear contraseña, caducidad de 48 horas y firma VaDeCountry. Se envían como `multipart/alternative`: incluyen una versión de texto y otra HTML con estilos integrados. El logo se carga desde `assets/vadecountry-logo.png` en la dirección pública de Compás; el contenido y el botón siguen siendo utilizables si el lector bloquea imágenes.
+
+La recuperación de contraseña conserva su mensaje específico. El remitente sigue siendo `mail_from` del archivo privado: esta mejora no cambia el transporte de correo ni sus credenciales. Si falla la generación o el envío, Compás sigue mostrando el enlace para compartirlo en privado.
+
+Para instalar esta plantilla, sube de `dist/clases/` a sus mismas rutas en el hosting: `api/index.php`, **`api/email.php`**, **`api/email-invitation.html`**, `api/.htaccess`, `index.html` y `sw.js`. Conserva el ajuste de `$configPath` en `api/index.php`. No requiere SQL ni cambios en `compas-config.php`. Los archivos de plantilla se incluyen en el paquete completo y el de catálogo, pero no en el ZIP de interfaz.
+
+La prueba `php tests/email_test.php` construye y comprueba el mensaje MIME sin enviar correos. Comprueba el resultado final con una nueva invitación en un buzón real tras actualizar el hosting.
