@@ -14,6 +14,7 @@ CREATE TABLE compas_library(id INTEGER PRIMARY KEY,payload TEXT NOT NULL,version
 $p->exec('CREATE TABLE compas_library_seen(user_id TEXT NOT NULL REFERENCES compas_users(id) ON DELETE CASCADE,coreo_id TEXT NOT NULL,PRIMARY KEY(user_id,coreo_id));
 CREATE TABLE compas_suggestions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES compas_users(id) ON DELETE CASCADE,source_id TEXT NOT NULL,payload TEXT NOT NULL,status TEXT NOT NULL DEFAULT \'pending\',created_at INTEGER NOT NULL,reviewed_at INTEGER,UNIQUE(user_id,source_id));');
 $p->exec('CREATE TABLE compas_library_receipts(user_id TEXT NOT NULL REFERENCES compas_users(id) ON DELETE CASCADE,coreo_id TEXT NOT NULL,publication_version INTEGER NOT NULL,disposition TEXT NOT NULL,PRIMARY KEY(user_id,coreo_id));');
+$p->exec('CREATE TABLE compas_suggestion_reviews(suggestion_id TEXT PRIMARY KEY REFERENCES compas_suggestions(id) ON DELETE CASCADE,reviewer_id TEXT NOT NULL REFERENCES compas_users(id),payload TEXT NOT NULL,review_note TEXT NOT NULL,created_at INTEGER NOT NULL);');
 $config=['dsn'=>'sqlite:'.$path,'app_url'=>'https://example.test/clases','mail_from'=>'compas@example.test','base_path'=>'/clases','setup_key'=>'test-only-installation-key-123456789','allow_insecure_local'=>true];
 file_put_contents($root.'/config.php',"<?php\nreturn ".var_export($config,true).";\n");
 chmod($root.'/config.php',0600);

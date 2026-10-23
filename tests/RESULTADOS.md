@@ -26,3 +26,8 @@ Se han ampliado `tests/api_test.py` y `tests/prepare.php` para comprobar novedad
 ## Ignorados por publicación (23 de octubre de 2026)
 
 Prueba en Chrome con API simulada superada: ignorar una novedad, ignorar las visibles, conservación en el catálogo completo, reaparición al volver a compartir e importación independiente posterior. La prueba existente de propuestas y revisión también pasa. Sintaxis JavaScript y Python comprobadas. Las pruebas de API ampliadas cubren aislamiento de ignorados, rechazo de versiones futuras, CSRF y mantenimiento del aviso ante una confirmación de una publicación anterior; no ejecutadas por falta de PHP en el entorno. La integración PHP/MySQL en hosting sigue pendiente.
+
+
+## Estados y revisión de propuestas (23 de octubre de 2026)
+
+Chrome real con API simulada: edición de la ficha pública antes de confirmar, conservación de la ficha privada, comentario en el historial, rechazo del formulario de descarte sin motivo, visualización del motivo guardado y etiquetas de estado actualizadas. También siguen pasando los escenarios anteriores de avisos, ignorados, navegación por rol y publicación individual. Se han ampliado las pruebas de API para ficha corregida, comentarios y estados de propuestas pendientes, aceptadas y descartadas; no ejecutadas por falta de PHP en este entorno. Pendiente probar la migración y las transacciones con PHP/MySQL en hosting.

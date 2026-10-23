@@ -20,12 +20,13 @@ const assert=require('node:assert/strict');
    cloudUser={id:'teacher',role:'teacher'};
    cloudApi=async(action,body)=>{
     calls.push({action,body});
+    if(action==='coreo-states')return {states:Object.fromEntries(db.coreos.map(c=>[c.id,proposals.find(s=>s.source_id===c.id)?.status|| (c.libraryId?'imported':'private')]))};
     if(action==='notifications')return {newCoreos:cloudUser.role==='admin'?7:seen.new>=noticeRevision?0:1,pendingSuggestions:cloudUser.role==='admin'?proposals.filter(s=>s.status==='pending').length:0};
     if(action==='library')return {coreos:[{id:'old',name:'Anterior',level:'Inicial'},{id:'new',name:'Nueva',level:'Inicial',publicationVersion:noticeRevision}],unseenIds:seen.new>=noticeRevision?[]:['new']};
     if(['library-seen','library-ignore'].includes(action)){for(const id of body.ids)seen[id]=Math.max(seen[id]||0,body.versions[id]);return {ok:true};}
     if(action==='suggestions'&&!body)return {suggestions:proposals};
     if(action==='suggestions'){proposals.push({id:'p1',source_id:'private',status:'pending',teacher_name:'Profe <script>',teacher_email:'profe@example.test',coreo:db.coreos[0]});return {id:'p1'};}
-    if(action==='review-suggestion'){proposals[0].status=body.decision;return {ok:true};}
+    if(action==='review-suggestion'){const suggestion=proposals.find(s=>s.id===body.id);suggestion.status=body.decision;suggestion.review_note=body.review_note;suggestion.reviewedCoreo=body.coreo;return {ok:true};}
     throw Error('Acción no simulada: '+action);
    };
    cloudStartNotifications();
@@ -52,16 +53,33 @@ const assert=require('node:assert/strict');
   await page.waitForFunction(()=>document.getElementById('cloud-notifications').hidden);
   await page.evaluate(()=>cloudSuggestions());await page.select('#suggestion-source','private');
   assert.equal(await page.$('#suggestion-preview img'),null);
-  await page.click('#form [type=submit]');await page.waitForFunction(()=>document.getElementById('suggestion-list').textContent.includes('Pendiente'));
+  await page.click('#form [type=submit]');await page.waitForFunction(()=>document.getElementById('suggestion-list').textContent.includes('Propuesta pendiente'));
   assert.equal(await page.$eval('#suggestion-source option[value=private]',e=>e.disabled),true);
   await page.evaluate(()=>{document.getElementById('modal').close();cloudUser.role='admin';return cloudRefreshNotifications();});
   await page.waitForSelector('[data-pending-suggestions]');assert.equal(await page.$('[data-new-coreos]'),null);await page.click('[data-pending-suggestions]');
   await page.waitForSelector('[data-review=accepted]');
   assert((await page.$eval('#suggestion-list',e=>e.textContent)).includes('Profe <script>'));
   assert.equal(await page.$('#suggestion-list script'),null);
-  await page.click('[data-review=accepted]');await page.waitForFunction(()=>document.getElementById('suggestion-list').textContent.includes('No hay propuestas'));
+  await page.click('[data-review=accepted]');await page.waitForSelector('#review-name');
+  await page.$eval('#review-name',e=>e.value='Ficha pública corregida');
+  await page.type('#review-note','Autor y ficha revisados');
+  await page.click('#form [type=submit]');await page.waitForFunction(()=>document.getElementById('suggestion-list').textContent.includes('No hay propuestas'));
   assert.equal(await page.evaluate(()=>proposals[0].status),'accepted');
   assert.equal(await page.$('[data-pending-suggestions]'),null);
+  assert.equal(await page.evaluate(()=>proposals[0].reviewedCoreo.name),'Ficha pública corregida');
+  assert.equal(await page.evaluate(()=>db.coreos[0].name),'Mi coreo');
+  await page.select('#suggestion-filter','accepted');
+  assert((await page.$eval('#suggestion-list',e=>e.textContent)).includes('Autor y ficha revisados'));
+  await page.evaluate(()=>{document.getElementById('modal').close();proposals.push({id:'reject-me',source_id:'reject-source',user_id:'another-teacher',status:'pending',teacher_name:'Otra profe',teacher_email:'otra@example.test',coreo:{name:'A corregir',level:'Inicial'}});return cloudSuggestions();});
+  await page.click('[data-review=rejected]');
+  assert.equal(await page.$eval('#review-note',e=>e.required),true);
+  const reviewsBefore=await page.evaluate(()=>calls.filter(c=>c.action==='review-suggestion').length);
+  await page.click('#form [type=submit]');
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.action==='review-suggestion').length),reviewsBefore);
+  await page.type('#review-note','Falta el enlace a la hoja');await page.click('#form [type=submit]');
+  await page.waitForSelector('#suggestion-filter');await page.select('#suggestion-filter','rejected');
+  assert((await page.$eval('#suggestion-list',e=>e.textContent)).includes('Falta el enlace a la hoja'));
+
   await page.evaluate(()=>{document.getElementById('modal').close();cloudUser.name='Admin';cloudUser.email='admin@example.test';cloudConfigureNavigation();});
   assert.equal(await page.$eval('aside nav #cloud-admin',e=>e.textContent),'Administración');
   await page.click('#cloud-admin');
@@ -96,7 +114,13 @@ const assert=require('node:assert/strict');
   await page.evaluate(()=>{cloudUser.role='admin';cloudUser.id='admin';proposals=[{id:'own',user_id:'admin',status:'pending',teacher_name:'Admin',teacher_email:'admin@example.test',coreo:{name:'Mi propia sugerencia',level:'Inicial'}},{id:'other',user_id:'teacher',status:'pending',teacher_name:'Otra profesora',teacher_email:'otra@example.test',coreo:{name:'Sugerencia externa',level:'Inicial'}}];return cloudSuggestions();});
   const proposalsText=await page.$eval('#suggestion-list',e=>e.textContent);
   assert(!proposalsText.includes('Mi propia sugerencia'));assert(proposalsText.includes('Otra profesora'));
+  await page.evaluate(()=>{const holder=document.createElement('div');holder.id='test-coreo-state';holder.innerHTML=cloudCoreoStateMarkup(db.coreos[0]);document.body.append(holder);return cloudRefreshCoreoStates();});
+  assert.equal(await page.$eval('#test-coreo-state',e=>e.textContent),'Privada');
+  await page.evaluate(()=>{proposals.push({source_id:db.coreos[0].id,status:'pending'});return cloudRefreshCoreoStates();});
+  assert.equal(await page.$eval('#test-coreo-state',e=>e.textContent),'Propuesta pendiente');
+  await page.evaluate(()=>{proposals.at(-1).status='rejected';return cloudRefreshCoreoStates();});
+  assert.equal(await page.$eval('#test-coreo-state',e=>e.textContent),'Propuesta descartada');
   assert.deepEqual(errors,[]);
-  console.log('OK: ignorar una o todas, volver a compartir, aviso, copia privada, propuesta, autor, aprobación y escape de HTML. API simulada.');
+  console.log('OK: estados, revisión editable, ficha privada intacta, motivo obligatorio, historial, avisos y acciones por rol. API simulada.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

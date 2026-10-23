@@ -291,3 +291,18 @@ En la vista **Coreografías**, cada ficha de la edición online incluye un icono
 
 
 La aprobación y publicación del catálogo no dependen de la tabla de preferencias `compas_library_receipts`, porque el administrador no recibe avisos del catálogo. Si una operación falla, la transacción conserva la propuesta pendiente y el catálogo anterior. Los errores internos incluyen una referencia para buscarlos en `error_log`. Para administradores, una tabla de avisos ausente o archivos de API de versiones distintas muestran instrucciones concretas de actualización.
+
+
+## Estados de coreografías y revisión de propuestas
+
+Las fichas privadas muestran **Privada**, **Compartida**, **Copiada del catálogo**, **Propuesta pendiente**, **Propuesta publicada** o **Propuesta descartada**. El estado se consulta en el servidor para la cuenta actual, se actualiza al publicar o proponer y se refresca con los avisos. No se guarda como una etiqueta editable en la ficha privada. Si falla la consulta, se indica que el estado no está disponible.
+
+En **Administración → Propuestas de profesores**, el administrador puede buscar por coreo, nombre o correo del profesor, y filtrar pendientes, publicadas, descartadas o todas. **Revisar y publicar** abre la ficha editable (nombre, autor, nivel, paredes, counts, enlaces y extras), junto con un comentario opcional para el profesor. La confirmación publica la ficha corregida, conserva el original privado y guarda la revisión. **Descartar con motivo** exige una explicación. El profesor ve el motivo o comentario en **Mis propuestas**, además de la ficha final publicada cuando esté disponible. Las propuestas revisadas en versiones anteriores conservan su estado aunque no tengan comentario ni ficha de revisión archivada.
+
+### Actualizar esta mejora
+
+1. Importa **`server/migration-suggestion-reviews.sql`** en la base de datos seleccionada en phpMyAdmin. Solo añade `compas_suggestion_reviews` y no borra datos. También se incluye en `dist/compas-catalogo-actualizacion.zip`.
+2. Sube `api/index.php`, `app.js`, `cloud.js`, `cloud.css`, `index.html` y `sw.js` de `dist/clases/` a las mismas rutas en el hosting. Conserva el ajuste privado de `$configPath` si lo habías personalizado.
+3. Recarga la web o acepta la actualización PWA. Comprueba una publicación corregida y un descarte con dos cuentas distintas.
+
+No subas el SQL a la carpeta pública. Para instalaciones nuevas, `schema.sql` ya contiene la tabla de revisiones. Los estados pueden consultarse sin esta tabla, pero la lista y revisión de propuestas requieren completar la migración.

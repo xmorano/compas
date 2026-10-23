@@ -19,6 +19,7 @@ a=s.index('let db;try{');b=s.index("let page='agenda'",a)
 s=s[:a]+'let db=structuredClone(window.COMPAS_INITIAL_DATA);'+s[b:]
 s=s.replace("function save(){localStorage.setItem('compas-v1',JSON.stringify(db))}", 'function save(){window.cloudSave(db)}')
 s=s.replace("toast('Cambios guardados')", "toast('Cambios preparados para guardar')")
+s=s.replace('<span class="tag">${esc(c.level)}</span><h3>', '<span class="tag">${esc(c.level)}</span>${cloudCoreoStateMarkup(c)}<h3>')
 s=s.replace('<div class="card-actions"><button class="button secondary" data-edit-coreo="${c.id}">', '<div class="card-actions">${cloudShareCoreoButton(c)}<button class="button secondary" data-edit-coreo="${c.id}">')
 s=s.replace('<div class="toolbar"><button class="button secondary" data-action="import-csv">', '<div class="toolbar"><button class="button secondary" type="button" onclick="cloudLibrary()">Catálogo común</button><button class="button secondary" type="button" onclick="cloudSuggestions()">Propuestas al catálogo</button><button class="button secondary" data-action="import-csv">')
 s=s.replace('◉ Datos de ejemplo para explorar tu estudio. Puedes editarlos y crear tus propios centros y clases.','◉ Tu espacio es privado. Empieza creando tus centros y cursos.')
@@ -74,7 +75,7 @@ sw=(ROOT/'server/pwa/sw.js').read_text().replace('__BUILD_VERSION__',version).re
 (out/'sw.js').write_text(sw)
 package=ROOT/'dist'/'compas-hostgator.zip'
 with zipfile.ZipFile(package,'w',zipfile.ZIP_DEFLATED) as z:
-    for source,name in [(ROOT/'INSTALACION.md','INSTALACION.md'),(ROOT/'server/schema.sql','schema.sql'),(ROOT/'server/migration-catalog.sql','migration-catalog.sql'),(ROOT/'server/migration-catalog-notices.sql','migration-catalog-notices.sql'),(ROOT/'server/config.example.php','config.example.php')]:
+    for source,name in [(ROOT/'INSTALACION.md','INSTALACION.md'),(ROOT/'server/schema.sql','schema.sql'),(ROOT/'server/migration-suggestion-reviews.sql','migration-suggestion-reviews.sql'),(ROOT/'server/migration-catalog.sql','migration-catalog.sql'),(ROOT/'server/migration-catalog-notices.sql','migration-catalog-notices.sql'),(ROOT/'server/config.example.php','config.example.php')]:
         z.write(source,name)
     for path in sorted(out.rglob('*')):
         if path.is_file():z.write(path,path.relative_to(out.parent))
@@ -90,6 +91,7 @@ print(ROOT/'dist/compas-pwa-actualizacion.zip')
 # Specific update with API and additive SQL migration; no configuration or user data.
 with zipfile.ZipFile(ROOT/'dist'/'compas-catalogo-actualizacion.zip','w',zipfile.ZIP_DEFLATED) as z:
     z.write(ROOT/'server/migration-catalog.sql','migration-catalog.sql')
+    z.write(ROOT/'server/migration-suggestion-reviews.sql','migration-suggestion-reviews.sql')
     z.write(ROOT/'server/migration-catalog-notices.sql','migration-catalog-notices.sql')
     for name in ['index.html','style.css','assets/vadecountry-logo.png','app.js','cloud.js','cloud.css','sw.js','api/index.php','api/lib.php']:
         z.write(out/name,'clases/'+name)

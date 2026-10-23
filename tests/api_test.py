@@ -73,19 +73,27 @@ assert 'libraryId' not in rows[0]['coreo']
 other.call('suggestions',expected=401)
 teacher.call('review-suggestion',{'id':suggestion,'decision':'accepted'},expected=403)
 admin.call('review-suggestion',{'id':suggestion,'decision':'invalid'},expected=400)
-admin.call('review-suggestion',{'id':suggestion,'decision':'accepted'})
+admin.call('review-suggestion',{'id':suggestion,'decision':'accepted','coreo':{**private['coreos'][0],'author':'Autor corregido'},'review_note':'Autor corregido para publicar'})
 admin.call('review-suggestion',{'id':suggestion,'decision':'accepted'},expected=409)
 assert admin.call('notifications')['pendingSuggestions']==0
 assert teacher.call('suggestions')['suggestions'][0]['status']=='accepted'
 published=next(c for c in teacher.call('library')['coreos'] if c['id']=='suggestion_'+suggestion)
 assert published['name']=='Mi versión'
+assert published['author']=='Autor corregido'
+assert teacher.call('coreo-states')['states']['private1']=='accepted'
+assert teacher.call('suggestions')['suggestions'][0]['review_note']=='Autor corregido para publicar'
+assert teacher.call('suggestions')['suggestions'][0]['reviewedCoreo']['author']=='Autor corregido'
 assert teacher.call('workspace')['data']==private
 # Approved data is a snapshot; subsequent private edits do not affect publication.
 private['coreos'][0]['name']='Cambio privado posterior'
 private['coreos'].append({**coreo,'id':'private2','name':'No publicar'})
 teacher.call('workspace',{'version':1,'data':private})
 rejected=teacher.call('suggestions',{'source_id':'private2'})['id']
-admin.call('review-suggestion',{'id':rejected,'decision':'rejected'})
+admin.call('review-suggestion',{'id':rejected,'decision':'rejected'},expected=400)
+assert teacher.call('coreo-states')['states']['private2']=='pending'
+admin.call('review-suggestion',{'id':rejected,'decision':'rejected','review_note':'Falta la hoja de pasos'})
+assert teacher.call('coreo-states')['states']['private2']=='rejected'
+assert next(s for s in teacher.call('suggestions')['suggestions'] if s['id']==rejected)['review_note']=='Falta la hoja de pasos'
 assert not any(c['name']=='No publicar' for c in teacher.call('library')['coreos'])
 assert next(c for c in teacher.call('library')['coreos'] if c['id']==published['id'])['name']=='Mi versión'
 # An authenticated third account cannot see the first teacher's suggestions.

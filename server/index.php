@@ -108,10 +108,28 @@ try {
         }
         $pdo->commit(); reply(['ok'=>true]);
     }
+    if ($action==='coreo-states' && $method==='GET') {
+        $workspace=json_decode(query('SELECT payload FROM compas_workspaces WHERE user_id=?',[$u['id']])->fetchColumn(),true,64,JSON_THROW_ON_ERROR);
+        $library=array_fill_keys(array_column(libraryData()['coreos'],'id'),true);
+        $suggestions=[];
+        foreach (query('SELECT id,source_id,status FROM compas_suggestions WHERE user_id=?',[$u['id']])->fetchAll() as $s) $suggestions[$s['source_id']]=$s;
+        $states=[];
+        foreach ($workspace['coreos'] as $c) {
+            $suggestion=$suggestions[$c['id']] ?? null;
+            if ($suggestion && $suggestion['status']==='pending') $state='pending';
+            elseif ($suggestion && $suggestion['status']==='rejected') $state='rejected';
+            elseif ($suggestion && $suggestion['status']==='accepted' && isset($library['suggestion_'.$suggestion['id']])) $state='accepted';
+            elseif (isset($library[$c['id']])) $state='shared';
+            elseif (!empty($c['libraryId']) && isset($library[$c['libraryId']])) $state='imported';
+            else $state='private';
+            $states[$c['id']]=$state;
+        }
+        reply(['states'=>(object)$states]);
+    }
     if ($action==='suggestions' && $method==='GET') {
         $where=$u['role']==='admin' ? ' WHERE s.user_id<>?' : ' WHERE s.user_id=?';
-        $rows=query('SELECT s.*,u.name AS teacher_name,u.email AS teacher_email FROM compas_suggestions s JOIN compas_users u ON u.id=s.user_id'.$where.' ORDER BY s.created_at DESC,s.id', [$u['id']])->fetchAll();
-        foreach ($rows as &$row) { $row['coreo']=json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR); unset($row['payload']); }
+        $rows=query('SELECT s.*,u.name AS teacher_name,u.email AS teacher_email,r.review_note,r.payload AS reviewed_payload FROM compas_suggestions s JOIN compas_users u ON u.id=s.user_id LEFT JOIN compas_suggestion_reviews r ON r.suggestion_id=s.id'.$where.' ORDER BY s.created_at DESC,s.id', [$u['id']])->fetchAll();
+        foreach ($rows as &$row) { $row['coreo']=json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR); $row['reviewedCoreo']=$row['reviewed_payload'] ? json_decode($row['reviewed_payload'],true,64,JSON_THROW_ON_ERROR) : null; unset($row['payload'],$row['reviewed_payload']); }
         unset($row); reply(['suggestions'=>$rows]);
     }
     if ($action==='suggestions' && $method==='POST') {
@@ -133,12 +151,24 @@ try {
     if ($action==='review-suggestion' && $method==='POST') {
         $id=textField($body,'id',32); $decision=textField($body,'decision',10);
         if (!in_array($decision,['accepted','rejected'],true)) fail('Decisión no válida.');
+        $note=textField($body,'review_note',2000);
+        if ($decision==='rejected' && !$note) fail('Indica el motivo del descarte para el profesor.');
         $pdo->beginTransaction();
         $changed=query("UPDATE compas_suggestions SET status=?,reviewed_at=? WHERE id=? AND status='pending'",[$decision,time(),$id]);
         if ($changed->rowCount()!==1) { $pdo->rollBack(); fail('La propuesta ya ha sido revisada o no existe.',409); }
+        $reviewed=[];
         if ($decision==='accepted') {
             $suggestion=query('SELECT payload FROM compas_suggestions WHERE id=?',[$id])->fetchColumn();
-            $coreo=json_decode($suggestion,true,64,JSON_THROW_ON_ERROR);
+            $original=json_decode($suggestion,true,64,JSON_THROW_ON_ERROR);
+            $coreo=$original;
+            if (array_key_exists('coreo',$body)) {
+                if (!is_array($body['coreo'])) fail('Ficha de revisión no válida.');
+                $coreo=sharedCoreo($body['coreo']);
+                $coreo['id']=$original['id'];
+                validateWorkspace(['centers'=>[],'groups'=>[],'sessions'=>[],'coreos'=>[$coreo]]);
+                if (!trim($coreo['name']) || !trim($coreo['level'])) fail('Indica el nombre y el nivel de la coreografía.');
+            }
+            $reviewed=sharedCoreo($coreo);
             $library=libraryData();
             foreach ($library['coreos'] as $existing) if (preg_replace('/\s+/u',' ',trim($existing['name'])) === preg_replace('/\s+/u',' ',trim($coreo['name'])) || strcasecmp(trim($existing['name']),trim($coreo['name']))===0) { $pdo->rollBack(); fail('Ya existe una coreografía con ese nombre en el catálogo común. Puedes descartar la propuesta.',409); }
             $coreo['id']='suggestion_'.$id;
@@ -149,6 +179,7 @@ try {
             if ($saved->rowCount()!==1) { $pdo->rollBack(); fail('El catálogo ha cambiado. Vuelve a revisar la propuesta.',409); }
             // Admins do not receive library notices; approval must not depend on receipts.
         }
+        query('INSERT INTO compas_suggestion_reviews (suggestion_id,reviewer_id,payload,review_note,created_at) VALUES (?,?,?,?,?)',[$id,$u['id'],json_encode($reviewed,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$note,time()]);
         $pdo->commit(); reply(['ok'=>true]);
     }
     if ($action==='library' && $method==='POST') {
@@ -210,9 +241,9 @@ try {
     // Expose only fixed installation guidance to administrators, never database details.
     if (($u['role'] ?? '')==='admin') {
         if ($e instanceof PDOException && in_array((string)$e->getCode(),['42S02','HY000'],true)) {
-            foreach (['compas_library_receipts','compas_library_seen','compas_suggestions'] as $table) {
+            foreach (['compas_library_receipts','compas_library_seen','compas_suggestions','compas_suggestion_reviews'] as $table) {
                 if (str_contains($e->getMessage(),$table) && preg_match('/doesn.t exist|no such table|not exist/i',$e->getMessage())) {
-                    $migration=$table==='compas_library_receipts' ? 'migration-catalog-notices.sql' : 'migration-catalog.sql';
+                    $migration=$table==='compas_suggestion_reviews' ? 'migration-suggestion-reviews.sql' : ($table==='compas_library_receipts' ? 'migration-catalog-notices.sql' : 'migration-catalog.sql');
                     fail('Falta actualizar la base de datos. Importa '.$migration.' en phpMyAdmin. Referencia: '.$reference,503);
                 }
             }
