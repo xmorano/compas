@@ -11,6 +11,7 @@ source_dirty=subprocess.check_output(['git','status','--porcelain','--',*source_
 release_label=revision[:7]+('-dev' if source_dirty else '')
 out=ROOT/'dist'/'clases'
 out.mkdir(parents=True,exist_ok=True)
+shutil.copytree(ROOT/'assets',out/'assets',dirs_exist_ok=True)
 for name in ['style.css','previous-class.js','csv.js','rich-extras.js']:
     shutil.copy2(ROOT/name,out/name)
 s=(ROOT/'app.js').read_text()
@@ -88,6 +89,6 @@ print(ROOT/'dist/compas-pwa-actualizacion.zip')
 # Specific update with API and additive SQL migration; no configuration or user data.
 with zipfile.ZipFile(ROOT/'dist'/'compas-catalogo-actualizacion.zip','w',zipfile.ZIP_DEFLATED) as z:
     z.write(ROOT/'server/migration-catalog.sql','migration-catalog.sql')
-    for name in ['index.html','app.js','cloud.js','cloud.css','sw.js','api/index.php','api/lib.php']:
+    for name in ['index.html','style.css','assets/vadecountry-logo.png','app.js','cloud.js','cloud.css','sw.js','api/index.php','api/lib.php']:
         z.write(out/name,'clases/'+name)
 print(ROOT/'dist'/'compas-catalogo-actualizacion.zip')
