@@ -1,6 +1,6 @@
 // Audio stays in this browser; it never enters the workspace JSON or the server.
 window.CompasMusic = (() => {
-  let connection, player, currentUrl, currentKey;
+  let connection, player, currentUrl, currentKey, queue=[], queueIndex=0;
   const scope = () => location.pathname.replace(/[^/]*$/, '') + ':' + (window.COMPAS_CLOUD ? (typeof cloudUser !== 'undefined' && cloudUser?.id || 'unavailable') : 'local');
   const key = id => scope() + ':' + id;
   const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -35,19 +35,20 @@ window.CompasMusic = (() => {
     } catch { box.querySelector('[role="status"]')?.replaceChildren(document.createTextNode('No se puede acceder a la música local. Permite el almacenamiento del navegador y recarga.')); }
   }
   function refreshAll(id) { document.querySelectorAll('[data-local-music]').forEach(box => { if(box.dataset.localMusic === id) refresh(box); }); }
-  function stop() {
+  function stop(clearQueue=true) {
+    if(clearQueue){queue=[];queueIndex=0;}
     if(player) {player.querySelector('audio').pause();player.remove();player = null;}
     if(currentUrl) URL.revokeObjectURL(currentUrl);
     currentUrl = currentKey = null;
   }
-  async function play(id, title) {
+  async function play(id, title, fromQueue=false) {
     const track = await record(id);
     if(!track) throw new Error('Vuelve a añadir el MP3 en este dispositivo.');
     if(currentKey === key(id) && player) {await player.querySelector('audio').play();return;}
-    stop();
+    stop(!fromQueue);
     currentKey = key(id);currentUrl = URL.createObjectURL(track.file);
     player = document.createElement('section');player.className = 'local-player';player.setAttribute('aria-label', 'Reproductor de música local');
-    player.innerHTML = `<strong>${escape(title)}</strong><audio controls preload="metadata"></audio><div class="music-speed"><label for="music-speed">Velocidad <output id="music-speed-value" for="music-speed">100 %</output></label><input id="music-speed" type="range" min="50" max="100" step="5" value="100" aria-valuetext="100 %"><button type="button" class="button secondary" data-speed-reset>Normal (100 %)</button></div><button data-player-close type="button" class="button secondary" aria-label="Cerrar reproductor">Cerrar ✕</button><small role="status"></small>`;
+    player.innerHTML = `<strong>${escape(title)}</strong><audio controls preload="metadata"></audio><div class="music-speed"><label for="music-speed">Velocidad <output id="music-speed-value" for="music-speed">100 %</output></label><input id="music-speed" type="range" min="50" max="100" step="5" value="100" aria-valuetext="100 %"><button type="button" class="button secondary" data-speed-reset>Normal (100 %)</button></div>${fromQueue?`<div class="music-queue"><button type="button" class="button secondary" data-queue-prev ${queueIndex===0?'disabled':''}>Anterior</button><span>${queueIndex+1} / ${queue.length}</span><button type="button" class="button secondary" data-queue-next ${queueIndex===queue.length-1?'disabled':''}>Siguiente</button></div>`:''}<button data-player-close type="button" class="button secondary" aria-label="Cerrar reproductor">Cerrar ✕</button><small role="status"></small>`;
     document.body.append(player);
     const audio = player.querySelector('audio');audio.src = currentUrl;
     audio.onerror = () => {if(player)player.querySelector('small').textContent = 'No se puede reproducir este archivo. Prueba con otro MP3.';};
@@ -63,7 +64,12 @@ window.CompasMusic = (() => {
     speed.oninput = () => {audio.playbackRate = Number(speed.value) / 100;updateSpeed();};
     audio.addEventListener('ratechange', updateSpeed);
     player.querySelector('[data-speed-reset]').onclick = () => {audio.playbackRate = 1;updateSpeed();};
-    player.querySelector('[data-player-close]').onclick = stop;
+    player.querySelector('[data-player-close]').onclick = ()=>stop();
+    if(fromQueue){
+      player.querySelector('[data-queue-prev]').onclick=()=>playQueueAt(queueIndex-1).catch(error=>toast(error.message));
+      player.querySelector('[data-queue-next]').onclick=()=>playQueueAt(queueIndex+1).catch(error=>toast(error.message));
+      audio.onended=()=>{if(queueIndex<queue.length-1)playQueueAt(queueIndex+1).catch(error=>toast(error.message));};
+    }
     await audio.play();
   }
   function choose(box) {
@@ -100,6 +106,14 @@ window.CompasMusic = (() => {
     document.querySelectorAll('[data-local-music]:not([data-ready])').forEach(box => {box.dataset.ready='true';refresh(box);});
   }
   new MutationObserver(hydrate).observe(document.getElementById('content'), {childList:true,subtree:true});
-  window.addEventListener('pagehide', stop);
-  return {markup, stop};
+  window.addEventListener('pagehide', ()=>stop());
+  async function available(ids){const results=await Promise.all(ids.map(async id=>await record(id)?id:null));return results.filter(Boolean);}
+  async function playQueueAt(index){if(index<0||index>=queue.length)return;queueIndex=index;const track=queue[index];await play(track.id,track.title,true);}
+  async function playList(tracks){
+    const ids=new Set(await available(tracks.map(t=>t.id))),ready=tracks.filter(t=>ids.has(t.id));
+    if(!ready.length)throw new Error('No hay MP3 locales para esta lista. Añádelos desde Coreografías en este dispositivo.');
+    stop();queue=ready;queueIndex=0;await playQueueAt(0);
+    return {played:ready.length,skipped:tracks.length-ready.length};
+  }
+  return {markup, stop:()=>stop(), available, playList};
 })();

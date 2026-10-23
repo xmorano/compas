@@ -3,7 +3,7 @@ const puppeteer=require('/home/xmorano/Work/Eventos/whatsapp-service/node_module
 (async()=>{
  const fixture='/tmp/compas-test-audio.mp3';
  cp.execFileSync('ffmpeg',['-v','error','-y','-f','lavfi','-i','sine=frequency=440:duration=10',fixture]);
- const browser=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',headless:true,args:['--no-sandbox']});
+ const browser=await puppeteer.launch({executablePath:process.env.CHROME_BINARY||(['/usr/bin/google-chrome','/opt/google/chrome/chrome'].find(path=>fs.existsSync(path))),headless:true,args:['--no-sandbox']});
  try{
  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:8134/');await page.click('[data-page="coreos"]');

@@ -50,7 +50,7 @@ function validateWorkspace(mixed $data): array {
             $ids[$key][$row['id']] = true;
             foreach ($required[$key] as $field) if (!isset($row[$field]) || !is_string($row[$field]) || strlen($row[$field]) > 2000) fail('Campo no válido: ' . $field);
             foreach ($row as $field => $value) {
-                if ($field === 'items' && $key === 'sessions') continue;
+                if (in_array($field,['items','attendance'],true) && $key === 'sessions') continue;
                 if (!is_scalar($value) && $value !== null) fail('Valor no válido en ' . $key);
                 if (is_string($value) && strlen($value) > 10000) fail('Texto demasiado largo.');
             }
@@ -58,11 +58,29 @@ function validateWorkspace(mixed $data): array {
         }
     }
     foreach ($out['groups'] as $g) if (!isset($ids['centers'][$g['center']])) fail('Un grupo hace referencia a un centro inexistente.');
+    $students=[];
+    if (array_key_exists('students',$data)) {
+        if (!is_array($data['students']) || !array_is_list($data['students']) || count($data['students'])>5000) fail('Lista de alumnos no válida.');
+        foreach ($data['students'] as $student) {
+            if (!is_array($student) || !is_string($student['id'] ?? null) || !preg_match('/^[a-zA-Z0-9_-]{1,100}$/D',$student['id']) || isset($students[$student['id']]) || !is_string($student['group'] ?? null) || !isset($ids['groups'][$student['group']]) || !is_string($student['name'] ?? null) || !trim($student['name']) || strlen($student['name'])>480 || !is_bool($student['active'] ?? null) || count($student)!==4) fail('Alumno no válido.');
+            $students[$student['id']]=$student;
+        }
+        $out['students']=$data['students'];
+    }
+
     foreach ($out['sessions'] as $s) {
         if (!isset($ids['groups'][$s['group']]) || !is_bool($s['closed'] ?? null) || !is_array($s['items'] ?? null) || !array_is_list($s['items'])) fail('Clase no válida.');
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', $s['date']);
         if (!$date || $date->format('Y-m-d') !== $s['date']) fail('Fecha no válida.');
         foreach (['start','end'] as $hour) if (!preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/D', $s[$hour])) fail('Hora no válida.');
+        if (array_key_exists('attendance',$s)) {
+            if (!is_array($s['attendance']) || !array_is_list($s['attendance']) || count($s['attendance'])>1000) fail('Asistencia no válida.');
+            $registered=[];
+            foreach ($s['attendance'] as $entry) {
+                if (!is_array($entry) || !is_string($entry['student'] ?? null) || !isset($students[$entry['student']]) || $students[$entry['student']]['group']!==$s['group'] || isset($registered[$entry['student']]) || !in_array($entry['status'] ?? null,['present','absent','excused'],true) || count($entry)!==2) fail('Registro de asistencia no válido.');
+                $registered[$entry['student']]=true;
+            }
+        }
         $seen = [];
         foreach ($s['items'] as $i) {
             if (!is_array($i) || !is_string($i['coreo'] ?? null) || !isset($ids['coreos'][$i['coreo']]) || isset($seen[$i['coreo']]) || !is_bool($i['done'] ?? null) || !in_array($i['mode'] ?? null, ['Nueva','Repaso','Bailar'], true) || !is_string($i['note'] ?? null) || strlen($i['note']) > 10000) fail('Registro de coreografía no válido.');

@@ -28,7 +28,7 @@ s=s.replace('◉ Datos de ejemplo para explorar tu estudio. Puedes editarlos y c
 s=s.replace("  loadCourseGroups();", "  picker.closest('form').querySelector('label[for=\"f-whatsappGroupId\"]').hidden=true;picker.hidden=true;status.textContent='Comparte los resúmenes desde tu propio WhatsApp.';reload.hidden=true;")
 s=s.replace('  reloadGroups();', "  destination.value='';destination.hidden=true;document.querySelector('label[for=\"share-destination\"]').hidden=true;reload.hidden=true;serviceStatus.textContent='Se abrirá tu WhatsApp para que elijas el grupo y confirmes el envío.';")
 # Bundle the editor so even older cloud loaders cannot omit this dependency.
-s=(ROOT/'local-music.js').read_text()+'\n'+(ROOT/'rich-extras.js').read_text().replace('EXTRAS_RICH_PREFIX','COMPAS_BUNDLED_EXTRAS_PREFIX')+'\n'+s
+s=(ROOT/'local-music.js').read_text()+'\n'+(ROOT/'class-tools.js').read_text()+'\n'+(ROOT/'rich-extras.js').read_text().replace('EXTRAS_RICH_PREFIX','COMPAS_BUNDLED_EXTRAS_PREFIX')+'\n'+s
 (out/'app.js').write_text(s)
 # Keep format helpers but no localhost endpoint in the public edition.
 w=(ROOT/'whatsapp.js').read_text()
@@ -97,3 +97,10 @@ with zipfile.ZipFile(ROOT/'dist'/'compas-catalogo-actualizacion.zip','w',zipfile
     for name in ['index.html','style.css','assets/vadecountry-logo.png','app.js','cloud.js','cloud.css','sw.js','api/index.php','api/lib.php','api/email.php','api/email-invitation.html','api/.htaccess']:
         z.write(out/name,'clases/'+name)
 print(ROOT/'dist'/'compas-catalogo-actualizacion.zip')
+
+# Class tools update: preserve the hosting's API entry point and private configuration.
+with zipfile.ZipFile(ROOT/'dist'/'compas-clases-actualizacion.zip','w',zipfile.ZIP_DEFLATED) as z:
+    for name in ['index.html','app.js','style.css','cloud.js','cloud.css','sw.js','api/lib.php']:
+        z.write(out/name,'clases/'+name)
+    z.writestr('ACTUALIZAR.txt','Actualización de herramientas de clase de Compás\n\nSube el contenido de clases/ a public_html/clases/, respetando api/lib.php.\nNo necesita SQL ni cambios en compas-config.php o api/index.php.\nRecarga la web o acepta la actualización de la PWA.\n\nIncluye sugerencias por grupo, playlist de MP3 locales, alumnos/asistencia y resumen visual exportable.\nLos MP3 siguen siendo locales al dispositivo. Alumnos y asistencia se guardan en la cuenta y nunca se incluyen en el resumen para alumnos.\n')
+print(ROOT/'dist/compas-clases-actualizacion.zip')

@@ -153,4 +153,21 @@ admin.call('library',{'version':current['version'],'coreos':[source]})
 assert next(c for c in third.call('library')['coreos'] if c['id']=='coreo2')['published'] is True
 assert 'coreo2' in third.call('library')['unseenIds']
 assert third.call('workspace')['data']==third_private
+# Optional students and attendance stay in the existing per-user workspace JSON.
+attendance_workspace={**third_private,
+ 'centers':[{'id':'attendance-center','name':'Centro asistencia','address':'Calle'}],
+ 'groups':[{'id':gid,'center':'attendance-center','level':'Inicial','day':'Lunes','start':'19:00','end':'20:00'} for gid in ['attendance-group','different-group']],
+ 'students':[{'id':'student-one','group':'attendance-group','name':'Ana','active':True},{'id':'student-other','group':'different-group','name':'Luis','active':True}],
+ 'sessions':[{'id':'attendance-session','group':'attendance-group','date':'2026-10-23','start':'19:00','end':'20:00','term':'T1','closed':True,'items':[{'coreo':'thirdcopy','done':True,'planned':True,'mode':'Nueva','note':'Privado'}],'attendance':[{'student':'student-one','status':'present'}]}]}
+v=third.call('workspace')['version']
+third.call('workspace',{'version':v,'data':attendance_workspace})
+assert third.call('workspace')['data']==attendance_workspace
+v=third.call('workspace')['version']
+for entries in [[{'student':'student-other','status':'present'}],[{'student':'missing','status':'present'}],[{'student':'student-one','status':'unknown'}],[{'student':'student-one','status':'present'}]*2]:
+ invalid={**attendance_workspace,'sessions':[{**attendance_workspace['sessions'][0],'attendance':entries}]}
+ third.call('workspace',{'version':v,'data':invalid},expected=400)
+invalid={**attendance_workspace,'students':[{**attendance_workspace['students'][0],'group':'missing'}]}
+third.call('workspace',{'version':v,'data':invalid},expected=400)
+assert third.call('workspace')['data']==attendance_workspace
+assert admin.call('workspace')['data']==empty
 print('API: cuentas, invitaciones de un uso, permisos, aislamiento, catálogo común, copias privadas, conflictos, validación, CSRF, recuperación y cierre correctos.')

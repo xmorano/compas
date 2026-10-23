@@ -41,3 +41,9 @@ Vista previa HTML comprobada en Chrome a 800 y 390 píxeles, con botón de activ
 ## Gestión visual y retirada del catálogo (23 de octubre de 2026)
 
 Chrome con API simulada (`tests/catalog_manager_test.cjs`): vista completa, filtros, selección, cancelación sin escritura, retirada por lotes, republicación de una ficha externa, publicación múltiple y ausencia de desbordamiento en móvil y escritorio. Revisada captura móvil. La prueba anterior de avisos, estados, propuestas y acciones por rol sigue pasando. Las pruebas de API se amplían con retirada exclusiva de admin, CSRF, conflictos de versión, conservación de copias privadas y nuevo aviso tras republicar; pendientes de ejecución por falta de PHP en el entorno. Sigue pendiente la integración PHP/MySQL en hosting.
+
+## Preparación, reproducción, asistencia y resumen (23 de octubre de 2026)
+
+Prueba real local en Chrome (`tests/class_tools_test.cjs`) con IndexedDB y MP3 generado: sugerencias por grupo sin futuras, prioridad de pendientes y adición sin marcar realizadas; alta de alumnos, asistencia e historial de enseñanzas perdidas; orden de playlist persistido, omisión de audio ausente, reproducción y avance automático/anterior; resumen limitado a realizadas con hoja de pasos y sin nombres de alumnos ni notas; restauración ante fallo de guardado y conservación tras recargar. Regresión de música individual superada, incluida persistencia, velocidad, aislamiento por cuenta, borrado e instalabilidad PWA. Siguen pasando últimas actividades, gestión de catálogo y propuestas con API simulada.
+
+Las pruebas de API incluyen alumnos y asistencia opcionales, referencias al grupo, rechazo de duplicados/estados inválidos y aislamiento por cuenta. No ejecutadas por falta de PHP en este entorno; pendiente validar guardado PHP/MySQL en el hosting tras actualizar `api/lib.php`. No se han enviado mensajes a alumnos ni generado páginas públicas.

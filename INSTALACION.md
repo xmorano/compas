@@ -328,3 +328,33 @@ Cada tarjeta permite **Publicar** o **Despublicar**. Se pueden seleccionar varia
 Despublicar conserva la ficha archivada para que el administrador pueda volver a publicarla. Los profesores dejan de verla en el catálogo y sus avisos, pero conservan sus copias privadas y sus clases. Volver a publicarla mantiene su identificador y genera un aviso nuevo; no actualiza automáticamente las copias que ya tienen los profesores. Publicar otras fichas no reactiva las retiradas.
 
 No requiere migración SQL: el estado se almacena dentro del catálogo existente. Las fichas antiguas se consideran publicadas. Para actualizar, sube de `dist/clases/`: `api/index.php`, `api/lib.php`, `app.js`, `cloud.js`, `cloud.css`, `index.html` y `sw.js`. Conserva el ajuste de `$configPath` en `api/index.php` si lo tienes personalizado.
+
+## Herramientas de preparación y seguimiento de clases
+
+En cada clase aparecen **Lista de reproducción**, **Asistencia** y **Resumen para alumnos**, además del desplegable **Sugerencias para preparar esta clase**.
+
+### Sugerencias del grupo
+
+Se basan exclusivamente en clases anteriores del mismo grupo (incluidas las de otro trimestre). Priorizan fichas planeadas sin realizar en su última aparición, coreos enseñadas en las dos clases anteriores y coreos enseñadas que llevan al menos 21 días sin bailarse. No usan clases futuras ni de otros grupos. Se muestran hasta ocho sugerencias con el motivo y se omiten las que ya están en la clase. Al añadir una, se marca como planeada, pendiente de realizar; si ya fue enseñada se propone como repaso. No modifica automáticamente el historial ni los estados de realizado.
+
+### Lista de reproducción por clase
+
+Muestra las coreografías en el orden guardado de esa clase y permite subirlas y bajarlas. El orden se guarda al moverlas; la vista de trabajo habitual conserva su orden alfabético. **Reproducir MP3 disponibles** reproduce en secuencia las copias locales del dispositivo, con controles anterior/siguiente, avance al terminar, pausa y velocidad. Los elementos sin MP3 local se omiten y se informa del número. Los enlaces de música se abren aparte; no se descargan ni se convierten vídeos. Al arrancar la lista se cierra el diálogo para poder usar el reproductor mientras trabajas en la clase. Cerrar el reproductor detiene y limpia la cola.
+
+### Alumnos y asistencia
+
+En **Centros y grupos → Alumnos** puedes añadir nombres (uno por línea), corregirlos, activar/desactivar y consultar su historial. También se accede desde **Asistencia → Gestionar alumnos**. No se recogen correos ni teléfonos. Cada grupo admite hasta 1000 alumnos y la cuenta hasta 5000. Desactivar conserva la asistencia anterior; no elimina al alumno.
+
+En cada clase se registran **Presente**, **Ausente**, **Justificada** o **Sin marcar**. Sin marcar no se interpreta como ausencia. Hay controles para todos presentes o limpiar las marcas. El historial de un alumno muestra su asistencia y las coreografías nuevas realizadas en esas clases; permite identificar qué enseñanzas se perdió. Cambiar el grupo de una clase limpia su asistencia, con aviso en el formulario, para evitar mezclar alumnos. Eliminar un centro elimina también los alumnos de sus grupos junto con sus clases.
+
+Los alumnos se guardan en la lista opcional `students` del JSON privado y la asistencia en `sessions[].attendance`; las copias antiguas sin esos campos siguen siendo válidas. La API valida identificadores, estados, duplicados y que el alumno pertenezca al grupo de la clase. Se incluyen en las copias de seguridad y al importarlas, pero nunca se publican en el catálogo común.
+
+### Resumen visual para alumnos
+
+**Resumen para alumnos** permite elegir entre las coreografías realizadas. La vista previa agrupa **Aprendimos**, **Repasamos** y **Bailamos**, con enlaces válidos a vídeo, música y hoja de pasos. Incluye WhatsApp (el usuario elige destinatario y confirma), copiar texto, descargar un HTML independiente y abrir una versión de impresión para guardar como PDF desde el navegador. El HTML conserva los enlaces y puede compartirse como archivo; no crea una página pública ni un enlace de acceso a la cuenta.
+
+No incluye nombres de alumnos, asistencia ni notas privadas. No adjunta ni publica los MP3 locales. Las coreografías solo planeadas quedan fuera del resumen. El envío clásico anterior de WhatsApp sigue disponible.
+
+### Actualizar estas cuatro mejoras
+
+Usa **`dist/compas-clases-actualizacion.zip`**: sube su carpeta `clases/` a `/public_html/clases/`, respetando las subcarpetas. Contiene `app.js`, `style.css`, `cloud.js`, `cloud.css`, `index.html`, `sw.js` y **`api/lib.php`**. No requiere SQL ni sustituir `api/index.php` o la configuración privada. Es imprescindible actualizar `api/lib.php` para que el servidor acepte y conserve alumnos y asistencia. Después recarga o acepta la actualización de la PWA.
