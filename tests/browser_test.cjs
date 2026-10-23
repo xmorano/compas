@@ -14,7 +14,7 @@ const assert=require('node:assert/strict');
  await page.waitForFunction(()=>document.querySelector('.saved').textContent==='● Guardado en tu cuenta');
  await page.reload();await page.waitForFunction(()=>window.COMPAS_LOADED===true);
  await page.click('[data-page="centros"]');assert((await page.$eval('#content',e=>e.textContent)).includes('Centro del administrador'));
- await page.click('#cloud-account');await page.click('#account-users');
+ await page.click('#cloud-admin');await page.click('#account-users');
  await page.type('#f-name','Profesora de prueba');await page.type('#f-email','browser-teacher@example.test');await page.click('#form button[type="submit"]');
  await page.waitForFunction(()=>document.getElementById('invite-link').value.includes('#acceso='));
  const link=await page.$eval('#invite-link',e=>e.value);

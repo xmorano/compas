@@ -107,7 +107,7 @@ El `localStorage` de `localhost` no se puede leer automáticamente desde tu domi
 En tu cuenta de administrador:
 
 1. Crea o importa las coreografías a tu catálogo privado (CSV o copia JSON).
-2. Entra en **Mi cuenta → Gestionar catálogo común**.
+2. Entra en **Administración → Catálogo común**.
 3. Marca las fichas que quieras ofrecer a los demás profesores, revisa autoría y enlaces y confirma la publicación.
 
 Solo se publican datos de la coreografía, no centros, clases ni notas. Publicar de nuevo la misma ficha actualiza la entrada común; las copias ya importadas por profesores permanecen independientes. El catálogo común comienza vacío y no contiene datos ficticios.
@@ -116,7 +116,7 @@ Cada profesor entra en **Coreografías → Catálogo común**, selecciona las fi
 
 ## 7. Invitar profesores y recuperar accesos
 
-En **Mi cuenta → Profesores e invitaciones**, escribe el correo y crea una invitación. Comparte el enlace en privado con esa persona. No se envía WhatsApp ni correo automáticamente. El invitado elige su contraseña y empieza con su espacio vacío.
+En **Administración → Profesores e invitaciones**, escribe el correo y crea una invitación. Comparte el enlace en privado con esa persona. No se envía WhatsApp ni correo automáticamente. El invitado elige su contraseña y empieza con su espacio vacío.
 
 Para recuperar una contraseña, el administrador crea un enlace de «Recuperar acceso». Al utilizarlo, se invalidan las sesiones anteriores de esa cuenta y se conservan sus datos. Un enlace nuevo invalida el anterior del mismo correo.
 
@@ -230,7 +230,7 @@ El reproductor de MP3 local incluye **Velocidad**, ajustable del 50 % al 100 % e
 
 ## Invitaciones por correo y consulta del administrador
 
-En **Mi cuenta → Profesores e invitaciones**, el administrador introduce el nombre y correo del profesor. Compás envía un enlace de activación de un solo uso, válido 48 horas. Al abrirlo, el profesor confirma su nombre y crea su contraseña antes de entrar. No se envían contraseñas por correo. La cuenta se crea cuando se acepta la invitación.
+En **Administración → Profesores e invitaciones**, el administrador introduce el nombre y correo del profesor. Compás envía un enlace de activación de un solo uso, válido 48 horas. Al abrirlo, el profesor confirma su nombre y crea su contraseña antes de entrar. No se envían contraseñas por correo. La cuenta se crea cuando se acepta la invitación.
 
 En el archivo privado `compas-config.php`, configura `app_url` con la dirección HTTPS completa de Compás (por ejemplo, `https://tudominio.com/clases`) y `mail_from` con una cuenta de correo de tu dominio autorizada en el hosting. Se utiliza la función `mail()` de PHP del hosting. La aceptación del mensaje por el servidor no garantiza su entrega: comprueba el envío y la carpeta de spam en una cuenta real. Si falla el envío, la pantalla conserva el enlace para compartirlo en privado.
 
@@ -245,7 +245,7 @@ Los avisos aparecen dentro de Compás al entrar y se consultan cada minuto mient
 - El aviso de coreografías nuevas abre el catálogo con **Solo coreografías nuevas** activado. Cada profesor puede seleccionar y copiar las fichas a su lista privada. Las copias mantienen su independencia.
 - Las novedades se recuerdan por cuenta en el servidor, también entre dispositivos. Copiar una ficha la marca como vista; también se pueden marcar todas las novedades cargadas como vistas sin importarlas. Las fichas que se publiquen después seguirán pendientes. Al instalar esta actualización, las fichas existentes se consideran novedades hasta que cada usuario las marque como vistas. Editar una copia privada no genera novedades. Volver a publicar expresamente una ficha común sí genera un nuevo aviso, aunque conserve el mismo identificador.
 - En **Coreografías → Propuestas al catálogo** o **Mi cuenta → Proponer coreografía / Mis propuestas**, el profesor selecciona una ficha privada y envía una propuesta. Se guarda una copia de su ficha en ese momento, sin centros ni clases. La lista muestra si está pendiente, publicada o descartada. Una misma ficha solo se puede proponer una vez.
-- El administrador recibe un aviso con el número de propuestas pendientes. Desde él, o desde **Mi cuenta → Propuestas de profesores**, consulta nombre, correo y ficha de cada propuesta. Puede **Publicar en catálogo común** o **Descartar**. La publicación crea una entrada independiente y genera una novedad para los usuarios. Se rechaza una aprobación repetida y se evita publicar una propuesta con un nombre ya existente.
+- El administrador recibe un aviso con el número de propuestas pendientes. Desde él, o desde **Administración → Propuestas de profesores**, consulta nombre, correo y ficha de cada propuesta. Puede **Publicar en catálogo común** o **Descartar**. La publicación crea una entrada independiente y genera una novedad para los usuarios. Se rechaza una aprobación repetida y se evita publicar una propuesta con un nombre ya existente.
 
 ### Actualizar una instalación existente
 
@@ -282,3 +282,6 @@ Para actualizar una instalación que ya tenga avisos y propuestas:
 3. Recarga la aplicación o acepta la actualización de la PWA.
 
 Las instalaciones nuevas usan `schema.sql`. La migración general `migration-catalog.sql` también incluye la nueva tabla y puede ejecutarse sin borrar las existentes. Las marcas de visto de la versión anterior se respetan para las fichas antiguas hasta su próxima publicación.
+
+
+El acceso **Administración** está en la navegación izquierda y solo se muestra a administradores. Agrupa profesores e invitaciones, catálogo común y propuestas. **Mi cuenta** conserva las opciones personales de contraseña, importación y cierre de sesión.

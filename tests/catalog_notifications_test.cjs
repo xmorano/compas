@@ -6,7 +6,7 @@ const assert=require('node:assert/strict');
  const browser=await puppeteer.launch({executablePath:'/opt/google/chrome/chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.setContent('<main><div id="cloud-warning"></div></main><dialog id="modal"><form id="form"><h2 id="modal-title"></h2><button type="button" id="close">Cerrar</button><div id="fields"></div><button type="button" id="cancel">Cancelar</button><button type="submit">Guardar</button></form></dialog>');
+  await page.setContent('<aside><nav></nav></aside><main><div id="cloud-warning"></div></main><dialog id="modal"><form id="form"><h2 id="modal-title"></h2><button type="button" id="close">Cerrar</button><div id="fields"></div><button type="button" id="cancel">Cancelar</button><button type="submit">Guardar</button></form></dialog>');
   let source=fs.readFileSync('server/cloud.js','utf8');
   source=source.slice(0,source.indexOf('(async()=>{try{'))+source.slice(source.indexOf('function libraryCopies'));
   await page.addScriptTag({content:source});
@@ -61,6 +61,18 @@ const assert=require('node:assert/strict');
   await page.click('[data-review=accepted]');await page.waitForFunction(()=>document.getElementById('suggestion-list').textContent.includes('No hay propuestas'));
   assert.equal(await page.evaluate(()=>proposals[0].status),'accepted');
   assert.equal(await page.$('[data-pending-suggestions]'),null);
+  await page.evaluate(()=>{document.getElementById('modal').close();cloudUser.name='Admin';cloudUser.email='admin@example.test';cloudConfigureNavigation();});
+  assert.equal(await page.$eval('aside nav #cloud-admin',e=>e.textContent),'Administración');
+  await page.click('#cloud-admin');
+  assert.equal(await page.$eval('#modal-title',e=>e.textContent),'Administración');
+  assert(await page.$('#account-users'));assert(await page.$('#account-library'));assert(await page.$('#account-suggestions'));
+  assert.equal(await page.$('#account-password'),null);
+  await page.click('#account-done');await page.evaluate(()=>cloudAccount());
+  assert(await page.$('#account-password'));assert.equal(await page.$('#account-users'),null);
+  await page.evaluate(()=>{document.getElementById('modal').close();cloudUser.role='teacher';cloudConfigureNavigation();cloudAdministration();});
+  assert.equal(await page.$('#cloud-admin'),null);
+  assert.equal(await page.$eval('#modal',e=>e.open),false);
+  await page.evaluate(()=>cloudAccount());assert(await page.$('#account-suggestions'));
   assert.deepEqual(errors,[]);
   console.log('OK: ignorar una o todas, volver a compartir, aviso, copia privada, propuesta, autor, aprobación y escape de HTML. API simulada.');
  }finally{await browser.close();}
