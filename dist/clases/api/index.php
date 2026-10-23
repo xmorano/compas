@@ -147,7 +147,7 @@ try {
             validateWorkspace(['centers'=>[],'groups'=>[],'sessions'=>[],'coreos'=>$library['coreos']]);
             $saved=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($library['coreos'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$library['version']]);
             if ($saved->rowCount()!==1) { $pdo->rollBack(); fail('El catálogo ha cambiado. Vuelve a revisar la propuesta.',409); }
-            recordLibraryReceipt($u['id'],$coreo['id'],$coreo['publicationVersion'],'seen');
+            // Admins do not receive library notices; approval must not depend on receipts.
         }
         $pdo->commit(); reply(['ok'=>true]);
     }
@@ -165,7 +165,7 @@ try {
         validateWorkspace(['centers'=>[], 'groups'=>[], 'sessions'=>[], 'coreos'=>$coreos]);
         $changed=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($coreos,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$body['version']]);
         if ($changed->rowCount()!==1) fail('El catálogo común ha cambiado. Ciérralo y vuelve a abrirlo.',409);
-        foreach ($data['coreos'] as $coreo) recordLibraryReceipt($u['id'],$coreo['id'],$library['version']+1,'seen');
+        // Only teachers need receipts; publishing is independent of notification preferences.
         $pdo->commit();
         reply(['version'=>$body['version']+1]);
     }
@@ -205,6 +205,21 @@ try {
     fail('Ruta no encontrada.',404);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
-    error_log('Compas API: ' . get_class($e) . ' ' . $e->getMessage());
-    fail('No se pudo completar la operación. Revisa la configuración del servidor o inténtalo de nuevo.',500);
+    $reference=bin2hex(random_bytes(4));
+    error_log('Compas API ['.$reference.'] action='.(is_string($action ?? null) ? $action : 'unknown').' '.get_class($e).' '.$e->getMessage());
+    // Expose only fixed installation guidance to administrators, never database details.
+    if (($u['role'] ?? '')==='admin') {
+        if ($e instanceof PDOException && in_array((string)$e->getCode(),['42S02','HY000'],true)) {
+            foreach (['compas_library_receipts','compas_library_seen','compas_suggestions'] as $table) {
+                if (str_contains($e->getMessage(),$table) && preg_match('/doesn.t exist|no such table|not exist/i',$e->getMessage())) {
+                    $migration=$table==='compas_library_receipts' ? 'migration-catalog-notices.sql' : 'migration-catalog.sql';
+                    fail('Falta actualizar la base de datos. Importa '.$migration.' en phpMyAdmin. Referencia: '.$reference,503);
+                }
+            }
+        }
+        if ($e instanceof Error && str_contains($e->getMessage(),'Call to undefined function')) {
+            fail('La API tiene archivos de versiones diferentes. Actualiza juntos api/index.php y api/lib.php. Referencia: '.$reference,503);
+        }
+    }
+    fail('No se pudo completar la operación. Referencia: '.$reference.'. Consulta esa referencia en el registro de errores del servidor.',500);
 }
