@@ -1,0 +1,13 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('app.js','utf8');
+const functions=source.slice(source.indexOf('function lastCoreoActivity('),source.indexOf('function first('));
+const session={id:'current',group:'g1',date:'2026-10-20',start:'19:30'};
+const entry=(id,date,mode,done=true,group='g1',start='19:30')=>({id,date,group,start,closed:false,items:[{coreo:'r1',mode,done}]});
+const context={db:{sessions:[entry('a','2026-09-01','Nueva'),entry('b','2026-09-08','Nueva'),entry('c','2026-10-01','Bailar'),entry('d','2026-10-10','Repaso'),entry('planned','2026-10-19','Bailar',false),entry('other','2026-10-19','Nueva',true,'g2'),entry('future','2026-10-21','Bailar'),entry('current','2026-10-20','Nueva'),entry('later','2026-10-20','Nueva',true,'g1','20:30')]},esc:s=>s,dateLabel:s=>s};
+vm.createContext(context);vm.runInContext(functions,context);
+assert.equal(JSON.stringify(context.lastCoreoActivity('r1',session)),JSON.stringify({Nueva:'2026-09-08',Bailar:'2026-10-01',Repaso:'2026-10-10'}));
+assert(context.lastCoreoActivityMarkup('r1',session).includes('Se bailó el 2026-10-01'));
+assert(context.lastCoreoActivityMarkup('missing',session).includes('Sin actividad anterior'));
+context.db.sessions.push(entry('earlier','2026-10-20','Bailar',true,'g1','18:30'));
+assert.equal(context.lastCoreoActivity('r1',session).Bailar,'2026-10-20');
+console.log('OK: últimas fechas por grupo y tipo, solo realizadas, sin clase actual ni futuras; incluye clases anteriores del mismo día.');

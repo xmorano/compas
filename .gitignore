@@ -1,0 +1,5 @@
+tests/runtime/
+*.local.php
+compas-config.php
+compas-copia-*.json
+coreografias_completas.csv
