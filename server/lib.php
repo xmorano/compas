@@ -52,9 +52,12 @@ function validateWorkspace(mixed $data): array {
             foreach ($row as $field => $value) {
                 if (in_array($field,['items','attendance'],true) && $key === 'sessions') continue;
                 if (!is_scalar($value) && $value !== null) fail('Valor no válido en ' . $key);
-                if (is_string($value) && strlen($value) > 10000) fail('Texto demasiado largo.');
+                if (is_string($value) && strlen($value) > ($key==='centers' && $field==='photo' ? 300000 : 10000)) fail('Texto demasiado largo.');
             }
-            foreach (['photo','music','video','sheet','whatsapp'] as $url) if (!empty($row[$url]) && (!is_string($row[$url]) || !filter_var($row[$url], FILTER_VALIDATE_URL) || !in_array(strtolower(parse_url($row[$url], PHP_URL_SCHEME) ?? ''), ['http','https'], true))) fail('Enlace no válido: ' . $url);
+            foreach (['photo','music','video','sheet','whatsapp'] as $url) if (!empty($row[$url])) {
+                if ($key==='centers' && $url==='photo' && is_string($row[$url]) && preg_match('/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+\/=]+)$/D',$row[$url],$imageMatch) && base64_decode($imageMatch[2],true)!==false) continue;
+                if (!is_string($row[$url]) || !filter_var($row[$url],FILTER_VALIDATE_URL) || !in_array(strtolower(parse_url($row[$url],PHP_URL_SCHEME) ?? ''),['http','https'],true)) fail('Enlace no válido: '.$url);
+            }
         }
     }
     foreach ($out['groups'] as $g) if (!isset($ids['centers'][$g['center']])) fail('Un grupo hace referencia a un centro inexistente.');

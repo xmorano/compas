@@ -28,7 +28,7 @@ s=s.replace('◉ Datos de ejemplo para explorar tu estudio. Puedes editarlos y c
 s=s.replace("  loadCourseGroups();", "  picker.closest('form').querySelector('label[for=\"f-whatsappGroupId\"]').hidden=true;picker.hidden=true;status.textContent='Comparte los resúmenes desde tu propio WhatsApp.';reload.hidden=true;")
 s=s.replace('  reloadGroups();', "  destination.value='';destination.hidden=true;document.querySelector('label[for=\"share-destination\"]').hidden=true;reload.hidden=true;serviceStatus.textContent='Se abrirá tu WhatsApp para que elijas el grupo y confirmes el envío.';")
 # Bundle the editor so even older cloud loaders cannot omit this dependency.
-s=(ROOT/'local-music.js').read_text()+'\n'+(ROOT/'students.js').read_text()+'\n'+(ROOT/'class-tools.js').read_text()+'\n'+(ROOT/'rich-extras.js').read_text().replace('EXTRAS_RICH_PREFIX','COMPAS_BUNDLED_EXTRAS_PREFIX')+'\n'+s
+s=(ROOT/'local-music.js').read_text()+'\n'+(ROOT/'students.js').read_text()+'\n'+(ROOT/'class-tools.js').read_text()+'\n'+(ROOT/'center-photos.js').read_text()+'\n'+(ROOT/'rich-extras.js').read_text().replace('EXTRAS_RICH_PREFIX','COMPAS_BUNDLED_EXTRAS_PREFIX')+'\n'+s
 (out/'app.js').write_text(s)
 # Keep format helpers but no localhost endpoint in the public edition.
 w=(ROOT/'whatsapp.js').read_text()

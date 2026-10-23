@@ -373,3 +373,12 @@ La foto admite enlace HTTP/HTTPS o archivo JPG/PNG/WebP de hasta 8 MB. Al subirl
 El JSON acepta `studentsEnabled` como preferencia opcional y perfiles con `groups` y `pastGroups` para inscripciones actuales e históricas. Se siguen leyendo perfiles antiguos con `group` único; al editarlos pasan al formato múltiple. El historial abarca todas las clases con asistencia de esa persona y muestra el centro/grupo. No hace falta migrar SQL.
 
 Para instalar, usa **`dist/compas-clases-actualizacion.zip`** o sube sus archivos de `clases/` a las mismas rutas: `index.html`, `app.js`, `style.css`, `cloud.js`, `cloud.css`, `sw.js` y **`api/lib.php`**. No se modifica la configuración privada ni `api/index.php`. Actualiza la interfaz y la validación del servidor juntas para conservar los campos de las fichas y las inscripciones múltiples.
+
+
+## Fotos de centros por archivo o URL
+
+Al crear o editar un centro, puedes poner la **URL de la foto** o usar **Subir una foto**. Se muestra una vista previa y **Quitar foto** permite dejar el centro sin imagen. Puedes sustituir una imagen subida por una URL, o una URL por otra imagen. Los cambios se aplican al guardar; cancelar conserva la foto anterior.
+
+Se admiten JPG, PNG y WebP de hasta 8 MB. El navegador reduce la imagen a un máximo de 768 píxeles (y, si hace falta, menos) y la convierte a JPEG antes de guardarla, con un máximo de 300 KB codificados. Se guarda en el JSON privado del centro, se sincroniza con la cuenta y se incluye en las copias de seguridad. No necesita carpetas de subida ni permisos nuevos en el hosting. Las URL HTTP/HTTPS existentes siguen funcionando.
+
+Para actualizar, sube de `dist/clases/`: **`app.js`**, **`style.css`**, **`api/lib.php`**, `index.html` y `sw.js`; también están en `dist/compas-clases-actualizacion.zip`. No requiere SQL ni tocar la configuración privada. Actualiza la interfaz y `api/lib.php` juntas para que el servidor acepte la foto subida.

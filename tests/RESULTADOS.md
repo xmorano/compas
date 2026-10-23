@@ -52,3 +52,8 @@ Las pruebas de API incluyen alumnos y asistencia opcionales, referencias al grup
 ## Directorio opcional de alumnos (23 de octubre de 2026)
 
 Chrome real (`tests/students_test.cjs`): controles de asistencia ocultos antes de activar, ficha con teléfono/correo/nivel/notas y foto subida y reducida, una persona en dos centros sin duplicación, asistencia en ambos grupos, retirada/reinscripción sin perder historial, desactivar/reactivar sin borrar datos, recarga, compatibilidad con perfiles antiguos y vista móvil sin desbordamiento. Siguen pasando herramientas de clase, música local, propuestas y catálogo. Pruebas API ampliadas para múltiples inscripciones, antiguas inscripciones con asistencia, fotos/correos inválidos y preferencia opcional; pendientes de ejecución por falta de PHP. Validación PHP/MySQL y recepción de los datos nuevos pendiente en hosting tras subir `api/lib.php`.
+
+
+## Fotos de centros (23 de octubre de 2026)
+
+Chrome real (`tests/center_photos_test.cjs`): alta con imagen subida, conversión a JPEG, vista previa, conservación tras recarga, sustitución por URL y por otro archivo, cancelar sin sobrescribir, quitar foto y diseño sin desbordamiento móvil. Regresión de fichas y fotos de alumnos superada. Pruebas API ampliadas para datos de imagen, URL, retirada y rechazo de SVG, esquemas inseguros, base64 inválido y exceso de tamaño; pendientes de ejecución por falta de PHP. Falta verificar el guardado PHP/MySQL en hosting tras subir `api/lib.php`.

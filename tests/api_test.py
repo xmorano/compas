@@ -187,4 +187,19 @@ for change in [{'groups':['different-group','different-group']},{'groups':['fore
  third.call('workspace',{'version':v,'data':invalid},expected=400)
 third.call('workspace',{'version':v,'data':{**expanded,'studentsEnabled':'yes'}},expected=400)
 assert third.call('workspace')['data']==expanded
+# Uploaded center photos are raster data URLs, persisted in the workspace JSON.
+photo_workspace=third.call('workspace')['data']
+image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aQ0cAAAAASUVORK5CYII='
+photo_workspace['centers'][0]['photo']=image
+v=third.call('workspace')['version'];third.call('workspace',{'version':v,'data':photo_workspace})
+assert third.call('workspace')['data']['centers'][0]['photo']==image
+v=third.call('workspace')['version']
+for bad in ['javascript:alert(1)','data:image/svg+xml;base64,PHN2Zz4=','data:image/png;base64,???','x'*300001]:
+ invalid={**photo_workspace,'centers':[{**photo_workspace['centers'][0],'photo':bad}]}
+ third.call('workspace',{'version':v,'data':invalid},expected=400)
+photo_workspace['centers'][0]['photo']='https://example.test/center.jpg'
+third.call('workspace',{'version':v,'data':photo_workspace})
+photo_workspace['centers'][0]['photo']=''
+v=third.call('workspace')['version'];third.call('workspace',{'version':v,'data':photo_workspace})
+assert third.call('workspace')['data']['centers'][0]['photo']==''
 print('API: cuentas, invitaciones de un uso, permisos, aislamiento, catálogo común, copias privadas, conflictos, validación, CSRF, recuperación y cierre correctos.')
