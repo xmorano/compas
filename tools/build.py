@@ -1,7 +1,14 @@
 """Build a deployable /clases directory without credentials or personal data."""
 from pathlib import Path
-import shutil, zipfile, hashlib, json
+import shutil, zipfile, hashlib, json, subprocess, html as html_escape
 ROOT=Path(__file__).resolve().parents[1]
+# Artifact-only commits do not change the displayed source revision.
+source_paths=['.',':(exclude)dist']
+revision=subprocess.check_output(['git','log','-1','--format=%H','--',*source_paths],cwd=ROOT,text=True).strip()
+if not revision:
+    raise RuntimeError('No se encontró un commit de código para identificar la versión.')
+source_dirty=subprocess.check_output(['git','status','--porcelain','--',*source_paths],cwd=ROOT,text=True).strip()
+release_label=revision[:7]+('-dev' if source_dirty else '')
 out=ROOT/'dist'/'clases'
 out.mkdir(parents=True,exist_ok=True)
 for name in ['style.css','previous-class.js','csv.js','rich-extras.js']:
@@ -11,7 +18,7 @@ a=s.index('let db;try{');b=s.index("let page='agenda'",a)
 s=s[:a]+'let db=structuredClone(window.COMPAS_INITIAL_DATA);'+s[b:]
 s=s.replace("function save(){localStorage.setItem('compas-v1',JSON.stringify(db))}", 'function save(){window.cloudSave(db)}')
 s=s.replace("toast('Cambios guardados')", "toast('Cambios preparados para guardar')")
-s=s.replace('<div class="toolbar"><button class="button secondary" data-action="import-csv">', '<div class="toolbar"><button class="button secondary" type="button" onclick="cloudLibrary()">Catálogo común</button><button class="button secondary" data-action="import-csv">')
+s=s.replace('<div class="toolbar"><button class="button secondary" data-action="import-csv">', '<div class="toolbar"><button class="button secondary" type="button" onclick="cloudLibrary()">Catálogo común</button><button class="button secondary" type="button" onclick="cloudSuggestions()">Propuestas al catálogo</button><button class="button secondary" data-action="import-csv">')
 s=s.replace('◉ Datos de ejemplo para explorar tu estudio. Puedes editarlos y crear tus propios centros y clases.','◉ Tu espacio es privado. Empieza creando tus centros y cursos.')
 # Cloud edition always uses the teacher's own WhatsApp sharing flow.
 s=s.replace("  loadCourseGroups();", "  picker.closest('form').querySelector('label[for=\"f-whatsappGroupId\"]').hidden=true;picker.hidden=true;status.textContent='Comparte los resúmenes desde tu propio WhatsApp.';reload.hidden=true;")
@@ -29,6 +36,7 @@ html=html.replace('<link rel="stylesheet" href="style.css">','<link rel="stylesh
 html=html.replace('</head>', '<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#7860cc"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Compás"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="icon" type="image/png" href="icons/icon-192.png"></head>')
 html=html.replace('<body><aside>','<body><section id="auth"><div class="auth-card">Cargando tu espacio…</div></section><aside hidden>')
 html=html.replace('<main>','<main hidden>')
+html=html.replace('</aside>', '<div class="app-version" aria-label="Versión de la aplicación" title="Commit de código: '+html_escape.escape(revision)+'"><span>Versión</span><code>'+html_escape.escape(release_label)+'</code></div></aside>')
 html=html.replace('● Guardado en este navegador','Conectando…')
 html=html.replace('<button class="icon" id="export"','<button class="button secondary" id="cloud-account">Mi cuenta</button><button class="icon" id="export"')
 html=html.replace('<div id="content">','<div id="cloud-warning" class="cloud-warning" hidden><span id="cloud-warning-text"></span><button id="cloud-retry" class="button secondary">Reintentar guardado</button><button id="cloud-backup" class="button secondary">Descargar mis cambios</button></div><div id="content">')
@@ -64,7 +72,7 @@ sw=(ROOT/'server/pwa/sw.js').read_text().replace('__BUILD_VERSION__',version).re
 (out/'sw.js').write_text(sw)
 package=ROOT/'dist'/'compas-hostgator.zip'
 with zipfile.ZipFile(package,'w',zipfile.ZIP_DEFLATED) as z:
-    for source,name in [(ROOT/'INSTALACION.md','INSTALACION.md'),(ROOT/'server/schema.sql','schema.sql'),(ROOT/'server/config.example.php','config.example.php')]:
+    for source,name in [(ROOT/'INSTALACION.md','INSTALACION.md'),(ROOT/'server/schema.sql','schema.sql'),(ROOT/'server/migration-catalog.sql','migration-catalog.sql'),(ROOT/'server/config.example.php','config.example.php')]:
         z.write(source,name)
     for path in sorted(out.rglob('*')):
         if path.is_file():z.write(path,path.relative_to(out.parent))
@@ -76,3 +84,10 @@ with zipfile.ZipFile(ROOT/'dist/compas-pwa-actualizacion.zip','w',zipfile.ZIP_DE
         if path.is_file() and 'api' not in path.relative_to(out).parts:
             z.write(path,path.relative_to(out.parent))
 print(ROOT/'dist/compas-pwa-actualizacion.zip')
+
+# Specific update with API and additive SQL migration; no configuration or user data.
+with zipfile.ZipFile(ROOT/'dist'/'compas-catalogo-actualizacion.zip','w',zipfile.ZIP_DEFLATED) as z:
+    z.write(ROOT/'server/migration-catalog.sql','migration-catalog.sql')
+    for name in ['index.html','app.js','cloud.js','cloud.css','sw.js','api/index.php','api/lib.php']:
+        z.write(out/name,'clases/'+name)
+print(ROOT/'dist'/'compas-catalogo-actualizacion.zip')

@@ -120,7 +120,7 @@ En **Mi cuenta → Profesores e invitaciones**, escribe el correo y crea una inv
 
 Para recuperar una contraseña, el administrador crea un enlace de «Recuperar acceso». Al utilizarlo, se invalidan las sesiones anteriores de esa cuenta y se conservan sus datos. Un enlace nuevo invalida el anterior del mismo correo.
 
-Guarda la contraseña del administrador en un gestor. Si se pierde el único acceso administrador, la recuperación requiere intervención del propietario del hosting sobre la base de datos; no existe un acceso maestro público. Esta beta no incorpora envío de correos, baja autoservicio ni gestión de suscripciones.
+Guarda la contraseña del administrador en un gestor. Si se pierde el único acceso administrador, la recuperación requiere intervención del propietario del hosting sobre la base de datos; no existe un acceso maestro público. Esta beta no incorpora baja autoservicio ni gestión de suscripciones.
 
 ## 8. Comprobaciones antes de invitar gente
 
@@ -226,3 +226,42 @@ La música permanece después de cerrar la app, pero borrar los datos del sitio 
 Para actualizar HostGator, sube el contenido de la carpeta `clases` de `dist/compas-pwa-actualizacion.zip` a `/clases/`. Este paquete no modifica PHP, configuración privada ni base de datos. No subas el `app.js` o `index.html` de la raíz del proyecto: pertenecen a la edición local.
 
 El reproductor de MP3 local incluye **Velocidad**, ajustable del 50 % al 100 % en pasos de 5 %, manteniendo el tono mediante el navegador. Puedes cambiarla mientras suena la música y volver con **Normal (100 %)**. Cada vez que abres un nuevo reproductor empieza al 100 %; el archivo original no se modifica. Este control se aplica a los MP3 importados, no a los enlaces externos de música.
+
+
+## Invitaciones por correo y consulta del administrador
+
+En **Mi cuenta → Profesores e invitaciones**, el administrador introduce el nombre y correo del profesor. Compás envía un enlace de activación de un solo uso, válido 48 horas. Al abrirlo, el profesor confirma su nombre y crea su contraseña antes de entrar. No se envían contraseñas por correo. La cuenta se crea cuando se acepta la invitación.
+
+En el archivo privado `compas-config.php`, configura `app_url` con la dirección HTTPS completa de Compás (por ejemplo, `https://tudominio.com/clases`) y `mail_from` con una cuenta de correo de tu dominio autorizada en el hosting. Se utiliza la función `mail()` de PHP del hosting. La aceptación del mensaje por el servidor no garantiza su entrega: comprueba el envío y la carpeta de spam en una cuenta real. Si falla el envío, la pantalla conserva el enlace para compartirlo en privado.
+
+En la lista de profesores registrados, **Ver recursos** muestra centros, cursos, coreografías con sus enlaces y clases con su repertorio. Es una consulta de solo lectura disponible exclusivamente para administradores. Cada profesor sigue trabajando únicamente con sus propios datos.
+
+Para actualizar una instalación existente, sube la interfaz del paquete `compas-pwa-actualizacion.zip` y **también `clases/api/index.php` del paquete completo**. Si habías ajustado la ruta privada de configuración dentro de ese PHP, conserva ese ajuste. Añade las dos opciones de correo al archivo privado. No es necesario cambiar el esquema SQL ni importar de nuevo la base de datos. El paquete de interfaz por sí solo no incorpora estas funciones del servidor.
+
+## Novedades del catálogo y propuestas de profesores
+
+Los avisos aparecen dentro de Compás al entrar y se consultan cada minuto mientras la aplicación está visible. No se envían correos ni notificaciones del teléfono por estas novedades.
+
+- El aviso de coreografías nuevas abre el catálogo con **Solo coreografías nuevas** activado. Cada profesor puede seleccionar y copiar las fichas a su lista privada. Las copias mantienen su independencia.
+- Las novedades se recuerdan por cuenta en el servidor, también entre dispositivos. Copiar una ficha la marca como vista; también se pueden marcar todas las novedades cargadas como vistas sin importarlas. Las fichas que se publiquen después seguirán pendientes. Al instalar esta actualización, las fichas existentes se consideran novedades hasta que cada usuario las marque como vistas. Editar una ficha ya vista no genera otra novedad.
+- En **Coreografías → Propuestas al catálogo** o **Mi cuenta → Proponer coreografía / Mis propuestas**, el profesor selecciona una ficha privada y envía una propuesta. Se guarda una copia de su ficha en ese momento, sin centros ni clases. La lista muestra si está pendiente, publicada o descartada. Una misma ficha solo se puede proponer una vez.
+- El administrador recibe un aviso con el número de propuestas pendientes. Desde él, o desde **Mi cuenta → Propuestas de profesores**, consulta nombre, correo y ficha de cada propuesta. Puede **Publicar en catálogo común** o **Descartar**. La publicación crea una entrada independiente y genera una novedad para los usuarios. Se rechaza una aprobación repetida y se evita publicar una propuesta con un nombre ya existente.
+
+### Actualizar una instalación existente
+
+1. En phpMyAdmin, selecciona la base de datos de Compás e importa **`migration-catalog.sql`** incluido en `dist/compas-catalogo-actualizacion.zip`. Añade dos tablas (`compas_library_seen` y `compas_suggestions`); no borra ni sustituye datos. No es necesario importar de nuevo el esquema completo.
+2. Del mismo ZIP, sube el contenido de `clases/` a `public_html/clases/`, respetando las subcarpetas: `app.js`, `cloud.js`, `cloud.css`, `sw.js`, `api/index.php` y `api/lib.php`.
+3. Si tu `api/index.php` tiene una ruta personalizada en `$configPath`, conserva ese ajuste. No sustituyas el archivo privado `compas-config.php`.
+4. Recarga o acepta la actualización de la PWA. Comprueba el flujo con una cuenta de profesor y otra de administrador.
+
+El SQL se importa desde el ordenador; no lo subas al directorio público. El ZIP de interfaz `compas-pwa-actualizacion.zip` por sí solo no basta para esta actualización. Una instalación nueva utiliza `schema.sql` del paquete completo, que ya incluye las dos tablas.
+
+
+La publicación del catálogo común conserva en el servidor todas las fichas anteriores aunque una petición solo incluya la nueva selección. Publicar una ficha con el mismo identificador actualiza esa ficha; omitirla no la elimina. La tabla `compas_library` contiene una única fila cuyo campo `payload` guarda la lista completa: actualizar esa fila es normal.
+
+
+## Versión visible y registro de cambios
+
+La barra izquierda muestra debajo de la cuenta el hash corto del commit de código utilizado para generar la web. El hash completo figura al pasar el ratón. Para actualizarlo en el hosting, sube `index.html`, `cloud.css` y `sw.js` de `dist/clases/`. El push a GitHub no despliega automáticamente en HostGator.
+
+Cada cambio se registra con su motivo y se envía al remoto. Primero se hace commit del código, después se ejecuta `python3 tools/build.py` y se registran los paquetes en otro commit. La versión mostrada identifica el commit del código, no el de empaquetado, evitando una referencia circular. Una compilación con fuentes sin registrar añade el sufijo `-dev`.

@@ -3,3 +3,6 @@ tests/runtime/
 compas-config.php
 compas-copia-*.json
 coreografias_completas.csv
+
+__pycache__/
+*.pyc

@@ -20,7 +20,7 @@ assert a['user']['role']=='admin'
 empty={'centers':[],'groups':[],'coreos':[],'sessions':[]}
 assert admin.call('workspace')['data']==empty
 teacher=Client();teacher.call('bootstrap')
-token=admin.call('invite',{'kind':'invite','email':'teacher@example.test'})['token']
+token=admin.call('invite',{'kind':'invite','name':'Profe','email':'teacher@example.test'})['token']
 u=teacher.call('claim',{'token':token,'name':'Profe','password':'Teacher-test-123456'})
 assert u['user']['role']=='teacher'
 other=Client();other.call('bootstrap');other.call('claim',{'token':token,'name':'Intruso','password':'Teacher-test-123456'},expected=400)
@@ -33,12 +33,71 @@ private={**empty,'centers':[{'id':'center1','name':'Centro privado','address':'D
 teacher.call('workspace',{'version':0,'data':private,'user_id':a['user']['id']})
 assert teacher.call('workspace')['data']==private
 assert admin.call('workspace')['data']==empty
+assert admin.call('teacher-workspace&user_id='+u['user']['id'])['data']==private
+teacher.call('teacher-workspace&user_id='+a['user']['id'],expected=403)
+admin.call('teacher-workspace&user_id='+'0'*32,expected=404)
+admin.call('teacher-workspace',{},expected=404)
+assert teacher.call('workspace&user_id='+a['user']['id'])['data']==private
 assert teacher.call('library')['coreos'][0]['name']=='Baile común'
 teacher.call('workspace',{'version':0,'data':empty},expected=409)
 assert teacher.call('workspace')['data']==private
 bad={**empty,'groups':[{'id':'g','center':'missing','level':'Inicial','day':'Lunes','start':'19:00','end':'20:00'}]}
 teacher.call('workspace',{'version':1,'data':bad},expected=400)
 teacher.call('workspace',{'version':1,'data':empty},expected=403,csrf='invalid')
+# Unread publications are per account, survive login, and ignore edits to seen IDs.
+assert teacher.call('notifications')['newCoreos']==1
+teacher.call('library-seen',{'ids':['coreo1']})
+teacher.call('library-seen',{'ids':['coreo1']})
+assert teacher.call('notifications')['newCoreos']==0
+assert admin.call('notifications')['newCoreos']==1
+admin.call('library',{'version':1,'coreos':[{**coreo,'name':'Baile común actualizado'}]})
+assert teacher.call('library')['unseenIds']==[]
+admin.call('library',{'version':2,'coreos':[{**coreo,'id':'coreo2','name':'Segunda publicación'}]})
+assert len(teacher.call('library')['coreos'])==2
+assert next(c for c in teacher.call('library')['coreos'] if c['id']=='coreo1')['name']=='Baile común actualizado'
+teacher.call('library-seen',{'ids':['coreo1']})
+assert teacher.call('library')['unseenIds']==['coreo2']
+teacher.call('library-seen',{'ids':[{}]},expected=400)
+teacher.call('library-seen',{'ids':['coreo2']},expected=403,csrf='invalid')
+# The server copies only a teacher's own saved routine, never an arbitrary payload.
+teacher.call('suggestions',{'source_id':'missing'},expected=404)
+suggestion=teacher.call('suggestions',{'source_id':'private1','user_id':a['user']['id'],'coreo':coreo})['id']
+teacher.call('suggestions',{'source_id':'private1'},expected=409)
+assert admin.call('notifications')['pendingSuggestions']==1
+assert teacher.call('notifications')['pendingSuggestions']==0
+rows=admin.call('suggestions')['suggestions']
+assert rows[0]['teacher_name']=='Profe' and rows[0]['coreo']['name']=='Mi versión'
+assert 'libraryId' not in rows[0]['coreo']
+other.call('suggestions',expected=401)
+teacher.call('review-suggestion',{'id':suggestion,'decision':'accepted'},expected=403)
+admin.call('review-suggestion',{'id':suggestion,'decision':'invalid'},expected=400)
+admin.call('review-suggestion',{'id':suggestion,'decision':'accepted'})
+admin.call('review-suggestion',{'id':suggestion,'decision':'accepted'},expected=409)
+assert admin.call('notifications')['pendingSuggestions']==0
+assert teacher.call('suggestions')['suggestions'][0]['status']=='accepted'
+published=next(c for c in teacher.call('library')['coreos'] if c['id']=='suggestion_'+suggestion)
+assert published['name']=='Mi versión'
+assert teacher.call('workspace')['data']==private
+# Approved data is a snapshot; subsequent private edits do not affect publication.
+private['coreos'][0]['name']='Cambio privado posterior'
+private['coreos'].append({**coreo,'id':'private2','name':'No publicar'})
+teacher.call('workspace',{'version':1,'data':private})
+rejected=teacher.call('suggestions',{'source_id':'private2'})['id']
+admin.call('review-suggestion',{'id':rejected,'decision':'rejected'})
+assert not any(c['name']=='No publicar' for c in teacher.call('library')['coreos'])
+assert next(c for c in teacher.call('library')['coreos'] if c['id']==published['id'])['name']=='Mi versión'
+# An authenticated third account cannot see the first teacher's suggestions.
+third=Client();third.call('bootstrap')
+third_token=admin.call('invite',{'kind':'invite','name':'Otra profe','email':'third@example.test'})['token']
+third.call('claim',{'token':third_token,'name':'Otra profe','password':'Third-test-123456'})
+assert third.call('suggestions')['suggestions']==[]
+assert third.call('notifications')['newCoreos']==3
+assert teacher.call('notifications')['newCoreos']==2
+# An empty publication never clears existing shared routines; stale versions still fail.
+before=admin.call('library')
+admin.call('library',{'version':before['version'],'coreos':[]})
+assert admin.call('library')['coreos']==before['coreos']
+admin.call('library',{'version':before['version'],'coreos':[]},expected=409)
 reset=admin.call('invite',{'kind':'reset','email':'teacher@example.test'})['token']
 other.call('claim',{'token':reset,'name':'Profe','password':'Changed-test-123456'})
 teacher.call('workspace',expected=401)
