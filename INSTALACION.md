@@ -288,3 +288,6 @@ El acceso **Administración** está en la navegación izquierda y solo se muestr
 
 
 En la vista **Coreografías**, cada ficha de la edición online incluye un icono de compartir. Para el administrador abre una confirmación para publicar únicamente esa ficha en el catálogo común. Para los profesores abre una confirmación para sugerirla al administrador. Cancelar no publica ni envía nada. Las propuestas se revisan en **Administración → Propuestas de profesores**, donde figura quién la ha enviado, con su nombre y correo.
+
+
+La aprobación y publicación del catálogo no dependen de la tabla de preferencias `compas_library_receipts`, porque el administrador no recibe avisos del catálogo. Si una operación falla, la transacción conserva la propuesta pendiente y el catálogo anterior. Los errores internos incluyen una referencia para buscarlos en `error_log`. Para administradores, una tabla de avisos ausente o archivos de API de versiones distintas muestran instrucciones concretas de actualización.
