@@ -103,9 +103,11 @@ function createUser(string $email, string $name, string $password, string $role)
     return query('SELECT * FROM compas_users WHERE id=?',[$id])->fetch();
 }
 
-function libraryData(): array {
+function libraryData(bool $includeUnpublished=false): array {
     $row=query('SELECT payload,version FROM compas_library WHERE id=1')->fetch();
-    return ['coreos'=>json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR),'version'=>(int)$row['version']];
+    $coreos=json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR);
+    if (!$includeUnpublished) $coreos=array_values(array_filter($coreos,fn($c)=>($c['published'] ?? true)!==false));
+    return ['coreos'=>$coreos,'version'=>(int)$row['version']];
 }
 function unseenLibraryIds(string $userId, array $coreos): array {
     $legacy=array_fill_keys(query('SELECT coreo_id FROM compas_library_seen WHERE user_id=?',[$userId])->fetchAll(PDO::FETCH_COLUMN),true);

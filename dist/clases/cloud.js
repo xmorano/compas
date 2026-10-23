@@ -222,22 +222,67 @@ async function cloudLibrary(onlyNew=false){
   cloudEl('library-ignore-all').onclick=()=>dismiss('library-ignore',visible().filter(c=>unseen.has(c.id)).map(c=>c.id));
   cloudEl('library-all').onclick=()=>{libraryCopies(visible(),visible().map(c=>c.id),db.coreos).forEach(c=>selected.add(c.libraryId));update();};
   cloudEl('library-none').onclick=()=>{selected.clear();update();};
-  try{const result=await cloudApi('library');if(!target.isConnected)return;unseen=new Set(result.unseenIds);catalog=result.coreos.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base',numeric:true}));update();}catch(error){if(target.isConnected)target.textContent=error.message;}
+  try{const result=await cloudApi('library');if(!target.isConnected)return;unseen=new Set(result.unseenIds);catalog=result.coreos.filter(c=>c.published!==false).sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base',numeric:true}));update();}catch(error){if(target.isConnected)target.textContent=error.message;}
 }
-async function cloudPublishLibrary(){
-  cloudDialog('Gestionar catálogo común','<p class="sub">Elige coreografías de tu catálogo privado para añadir o actualizar sus fichas públicas. Se comparten nombre, autor, nivel, paredes, counts y enlaces. Las copias que ya tienen otros profesores no se modifican.</p><div class="card-actions"><button type="button" class="button secondary" id="publish-all">Marcar todas</button><button type="button" class="button secondary" id="publish-none">Desmarcar todas</button></div><div id="publish-list" class="share-list"></div><label class="share-option"><input type="checkbox" required><span>Quiero publicar estas fichas para todos los profesores de Compás.</span></label><p id="publish-info" class="sub"></p>',async()=>{
-    const ids=[...document.querySelectorAll('[data-publish]:checked')].map(b=>b.value);
-    if(!ids.length)throw new Error('Selecciona al menos una coreografía.');
-    const selection=db.coreos.filter(c=>ids.includes(c.id)).map(c=>{const {libraryId,publicationVersion,...copy}=c;copy.id=libraryId||c.id;return copy;});
-    await cloudApi('library',{version:library.version,coreos:selection});document.getElementById('modal').close();toast('Catálogo común actualizado');await cloudRefreshCoreoStates();await cloudRefreshNotifications();
-  },'Publicar selección');
-  let library;
-  const submit=document.querySelector('#form button[type="submit"]');submit.disabled=true;
-  const target=cloudEl('publish-list');
-  cloudEl('publish-all').onclick=()=>target.querySelectorAll('[data-publish]').forEach(input=>input.checked=true);
-  cloudEl('publish-none').onclick=()=>target.querySelectorAll('[data-publish]').forEach(input=>input.checked=false);
-  target.innerHTML=[...db.coreos].sort((a,b)=>a.name.localeCompare(b.name,'es')).map(c=>`<label class="share-option"><input type="checkbox" data-publish value="${cloudEscape(c.id)}"><span>${cloudEscape(c.name)}</span></label>`).join('')||'<p class="empty">Importa o crea coreografías en tu catálogo privado primero.</p>';
-  try{library=await cloudApi('library');if(target.isConnected){cloudEl('publish-info').textContent=library.coreos.length+' coreografías en el catálogo común';submit.disabled=!db.coreos.length;}}catch(error){if(target.isConnected)cloudEl('publish-info').textContent=error.message;}
+let cloudLibraryManager=null;
+function cloudPublishLibrary(){
+  if(cloudUser.role!=='admin')return;
+  cloudLibraryManager=null;page='library-admin';activeSession=null;render();
+}
+function cloudManagerRows(catalog,own){
+  const rows=new Map(catalog.map(c=>[c.id,{id:c.id,coreo:c,source:null,published:c.published!==false,archived:c.published===false}]));
+  for(const c of own){const id=c.libraryId||c.id;if(rows.has(id))rows.get(id).source=c;else rows.set(id,{id,coreo:c,source:c,published:false,archived:false});}
+  return [...rows.values()].sort((a,b)=>a.coreo.name.localeCompare(b.coreo.name,'es',{sensitivity:'base',numeric:true}));
+}
+function cloudRenderLibraryManager(){
+  if(cloudUser.role!=='admin'){go('coreos');return;}
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.id==='cloud-admin'));
+  cloudEl('crumb').textContent='Administración / Catálogo común';
+  cloudEl('content').innerHTML=`<section id="library-manager"><div class="heading"><div><div class="eyebrow">ADMINISTRACIÓN</div><h1>Catálogo común</h1><p class="sub">Elige qué coreografías compartes con los profesores.</p></div><button type="button" class="button secondary" id="manager-reload">Actualizar</button></div><div id="manager-summary" class="manager-summary"></div><div class="toolbar manager-toolbar"><input type="search" id="manager-search" placeholder="Buscar coreografía o autor…" aria-label="Buscar coreografía o autor"><label class="manager-filter">Mostrar<select id="manager-filter"><option value="all">Todas</option><option value="published">Publicadas</option><option value="unpublished">Sin publicar</option><option value="archived">Retiradas</option></select></label></div><div class="manager-bulk"><div class="card-actions"><button type="button" class="text-button" id="manager-all">Marcar visibles</button><button type="button" class="text-button" id="manager-none">Desmarcar todas</button><span id="manager-selected" class="sub" role="status"></span></div><div class="card-actions"><button type="button" class="button" id="manager-publish" disabled>Publicar selección</button><button type="button" class="button secondary" id="manager-unpublish" disabled>Despublicar selección</button></div></div><p id="manager-error" class="csv-errors" role="alert" hidden></p><p class="sub manager-help">Despublicar impide nuevas importaciones. Las copias privadas de los profesores se conservan.</p><div class="cards manager-cards" id="manager-cards" aria-live="polite">Cargando catálogo…</div></section>`;
+  const root=cloudEl('library-manager');
+  if(!cloudLibraryManager)cloudLibraryManager={rows:[],version:0,selected:new Set(),query:'',filter:'all',loading:true};
+  const state=cloudLibraryManager;
+  function visible(){const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es');const q=normalize(state.query);return state.rows.filter(row=>(state.filter==='all'||state.filter==='published'&&row.published||state.filter==='unpublished'&&!row.published||state.filter==='archived'&&row.archived)&&(!q||normalize(row.coreo.name+' '+(row.coreo.author||'')).includes(q)));}
+  function draw(){
+    if(!root.isConnected)return;
+    const e=cloudEscape,shown=visible(),published=state.rows.filter(r=>r.published).length;
+    cloudEl('manager-summary').innerHTML=`<div><strong>${published}</strong><span>Publicadas</span></div><div><strong>${state.rows.length-published}</strong><span>Sin publicar</span></div><div><strong>${shown.length}</strong><span>En esta vista</span></div>`;
+    cloudEl('manager-cards').innerHTML=shown.map(row=>`<article class="card manager-card"><div class="manager-card-top"><span class="coreo-state ${row.published?'shared':'private'}">${row.published?'Publicada':row.archived?'Retirada':'Sin publicar'}</span><label class="manager-checkbox"><input type="checkbox" data-manager-select="${e(row.id)}" aria-label="Seleccionar ${e(row.coreo.name)}" ${state.selected.has(row.id)?'checked':''}><span>Seleccionar</span></label></div><h3>${e(row.coreo.name)}</h3><p>${e(row.coreo.author)||'Autor pendiente'}</p><span class="tag">${e(row.coreo.level)}</span><small>${e(row.coreo.counts||'—')} counts · ${e(row.coreo.walls||'—')} paredes</small><div class="card-actions"><button type="button" class="button ${row.published?'secondary':''}" data-manager-operation="${row.published?'unpublish':'publish'}" data-manager-id="${e(row.id)}">${row.published?'Despublicar':'Publicar'}</button></div></article>`).join('')||'<div class="empty">No hay coreografías con estos filtros. Añade coreos a tu lista privada para publicarlas aquí.</div>';
+    const selected=state.rows.filter(r=>state.selected.has(r.id));
+    cloudEl('manager-selected').textContent=state.selected.size+' seleccionadas';
+    cloudEl('manager-publish').disabled=state.loading||!selected.some(r=>!r.published);
+    cloudEl('manager-unpublish').disabled=state.loading||!selected.some(r=>r.published);
+    cloudEl('manager-all').disabled=state.loading||!shown.length;
+  }
+  async function load(){
+    state.loading=true;cloudEl('manager-reload').disabled=true;
+    cloudEl('manager-publish').disabled=cloudEl('manager-unpublish').disabled=true;
+    try{const result=await cloudApi('library');state.version=result.version;state.rows=cloudManagerRows(result.coreos,db.coreos);state.selected.clear();state.loading=false;if(root.isConnected){cloudEl('manager-error').hidden=true;draw();}}
+    catch(error){if(root.isConnected){cloudEl('manager-error').hidden=false;cloudEl('manager-error').textContent=error.message;cloudEl('manager-cards').textContent='No se pudo cargar el catálogo. Pulsa Actualizar para reintentarlo.';}}
+    finally{if(root.isConnected)cloudEl('manager-reload').disabled=false;}
+  }
+  function operate(operation,ids){
+    if(state.loading)return;
+    const rows=state.rows.filter(r=>ids.includes(r.id)&&(operation==='publish'?!r.published:r.published));
+    if(!rows.length)return;
+    const publishing=operation==='publish',e=cloudEscape;
+    cloudDialog(publishing?'Publicar en el catálogo común':'Despublicar del catálogo común',`<p class="sub">${publishing?'Los profesores podrán ver e importar estas coreografías y recibirán un aviso.':'Estas coreografías dejarán de estar disponibles para nuevas importaciones. Las copias privadas y sus clases no se modifican.'}</p><div class="share-list">${rows.map(r=>`<div class="share-option">${e(r.coreo.name)}</div>`).join('')}</div><p class="sub">${rows.length} coreografías</p>`,async()=>{
+      if(publishing){const coreos=rows.map(r=>{const {libraryId,publicationVersion,published,...copy}=r.source||r.coreo;return {...copy,id:r.id};});await cloudApi('library',{version:state.version,coreos});}
+      else await cloudApi('library-unpublish',{version:state.version,ids:rows.map(r=>r.id)});
+      document.getElementById('modal').close();await load();await cloudRefreshCoreoStates();await cloudRefreshNotifications();toast(publishing?'Coreografías publicadas':'Coreografías retiradas del catálogo común');
+    },publishing?'Confirmar publicación':'Confirmar despublicación');
+  }
+  cloudEl('manager-search').value=state.query;cloudEl('manager-filter').value=state.filter;
+  cloudEl('manager-search').oninput=event=>{state.query=event.target.value;draw();};
+  cloudEl('manager-filter').onchange=event=>{state.filter=event.target.value;state.selected.clear();draw();};
+  cloudEl('manager-all').onclick=()=>{visible().forEach(r=>state.selected.add(r.id));draw();};
+  cloudEl('manager-none').onclick=()=>{state.selected.clear();draw();};
+  cloudEl('manager-reload').onclick=load;
+  cloudEl('manager-publish').onclick=()=>operate('publish',[...state.selected]);
+  cloudEl('manager-unpublish').onclick=()=>operate('unpublish',[...state.selected]);
+  cloudEl('manager-cards').onchange=event=>{const id=event.target.dataset.managerSelect;if(id){if(event.target.checked)state.selected.add(id);else state.selected.delete(id);draw();}};
+  cloudEl('manager-cards').onclick=event=>{const button=event.target.closest('[data-manager-operation]');if(button)operate(button.dataset.managerOperation,[button.dataset.managerId]);};
+  if(state.loading)load();else draw();
 }
 
 async function cloudInspectTeacher(id){
