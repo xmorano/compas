@@ -1,3 +1,3 @@
-<Files "lib.php">
+<FilesMatch "^(lib\.php|email\.php|email-invitation\.html)$">
 Require all denied
-</Files>
+</FilesMatch>
