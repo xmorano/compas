@@ -20,7 +20,7 @@ const assert=require('node:assert/strict');
    cloudUser={id:'teacher',role:'teacher'};
    cloudApi=async(action,body)=>{
     calls.push({action,body});
-    if(action==='notifications')return {newCoreos:cloudUser.role==='admin'||seen.new>=noticeRevision?0:1,pendingSuggestions:cloudUser.role==='admin'?proposals.filter(s=>s.status==='pending').length:0};
+    if(action==='notifications')return {newCoreos:cloudUser.role==='admin'?7:seen.new>=noticeRevision?0:1,pendingSuggestions:cloudUser.role==='admin'?proposals.filter(s=>s.status==='pending').length:0};
     if(action==='library')return {coreos:[{id:'old',name:'Anterior',level:'Inicial'},{id:'new',name:'Nueva',level:'Inicial',publicationVersion:noticeRevision}],unseenIds:seen.new>=noticeRevision?[]:['new']};
     if(['library-seen','library-ignore'].includes(action)){for(const id of body.ids)seen[id]=Math.max(seen[id]||0,body.versions[id]);return {ok:true};}
     if(action==='suggestions'&&!body)return {suggestions:proposals};
@@ -55,7 +55,7 @@ const assert=require('node:assert/strict');
   await page.click('#form [type=submit]');await page.waitForFunction(()=>document.getElementById('suggestion-list').textContent.includes('Pendiente'));
   assert.equal(await page.$eval('#suggestion-source option[value=private]',e=>e.disabled),true);
   await page.evaluate(()=>{document.getElementById('modal').close();cloudUser.role='admin';return cloudRefreshNotifications();});
-  await page.waitForSelector('[data-pending-suggestions]');await page.click('[data-pending-suggestions]');
+  await page.waitForSelector('[data-pending-suggestions]');assert.equal(await page.$('[data-new-coreos]'),null);await page.click('[data-pending-suggestions]');
   await page.waitForSelector('[data-review=accepted]');
   assert((await page.$eval('#suggestion-list',e=>e.textContent)).includes('Profe <script>'));
   assert.equal(await page.$('#suggestion-list script'),null);
@@ -93,6 +93,9 @@ const assert=require('node:assert/strict');
   await page.click('#form [type=submit]');await page.waitForFunction(()=>!document.getElementById('modal').open);
   const suggestion=await page.evaluate(()=>calls.filter(c=>c.action==='suggestions'&&c.body).at(-1));
   assert.equal(suggestion.body.source_id,'candidate');
+  await page.evaluate(()=>{cloudUser.role='admin';cloudUser.id='admin';proposals=[{id:'own',user_id:'admin',status:'pending',teacher_name:'Admin',teacher_email:'admin@example.test',coreo:{name:'Mi propia sugerencia',level:'Inicial'}},{id:'other',user_id:'teacher',status:'pending',teacher_name:'Otra profesora',teacher_email:'otra@example.test',coreo:{name:'Sugerencia externa',level:'Inicial'}}];return cloudSuggestions();});
+  const proposalsText=await page.$eval('#suggestion-list',e=>e.textContent);
+  assert(!proposalsText.includes('Mi propia sugerencia'));assert(proposalsText.includes('Otra profesora'));
   assert.deepEqual(errors,[]);
   console.log('OK: ignorar una o todas, volver a compartir, aviso, copia privada, propuesta, autor, aprobación y escape de HTML. API simulada.');
  }finally{await browser.close();}
