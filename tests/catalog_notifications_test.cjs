@@ -15,13 +15,13 @@ const assert=require('node:assert/strict');
    window.db={coreos:[{id:'private',name:'Mi coreo',level:'Inicial',music:'https://example.test/song',extras:'<img src=x onerror=alert(1)>'}]};
    window.matchingRoutines=(rows,q)=>rows.filter(c=>c.name.includes(q));window.save=()=>{};window.render=()=>{};window.toast=message=>window.lastToast=message;
    window.modal=(title,html)=>{document.getElementById('modal-title').textContent=title;document.getElementById('fields').innerHTML=html;document.querySelector('[type=submit]').disabled=false;document.getElementById('modal').showModal();};
-   window.calls=[];window.proposals=[];window.seen=[];
+   window.calls=[];window.proposals=[];window.seen={};window.noticeRevision=1;
    cloudUser={id:'teacher',role:'teacher'};
    cloudApi=async(action,body)=>{
     calls.push({action,body});
-    if(action==='notifications')return {newCoreos:seen.includes('new')?0:1,pendingSuggestions:cloudUser.role==='admin'?proposals.filter(s=>s.status==='pending').length:0};
-    if(action==='library')return {coreos:[{id:'old',name:'Anterior',level:'Inicial'},{id:'new',name:'Nueva',level:'Inicial'}],unseenIds:seen.includes('new')?[]:['new']};
-    if(action==='library-seen'){seen.push(...body.ids);return {ok:true};}
+    if(action==='notifications')return {newCoreos:cloudUser.role==='admin'||seen.new>=noticeRevision?0:1,pendingSuggestions:cloudUser.role==='admin'?proposals.filter(s=>s.status==='pending').length:0};
+    if(action==='library')return {coreos:[{id:'old',name:'Anterior',level:'Inicial'},{id:'new',name:'Nueva',level:'Inicial',publicationVersion:noticeRevision}],unseenIds:seen.new>=noticeRevision?[]:['new']};
+    if(['library-seen','library-ignore'].includes(action)){for(const id of body.ids)seen[id]=Math.max(seen[id]||0,body.versions[id]);return {ok:true};}
     if(action==='suggestions'&&!body)return {suggestions:proposals};
     if(action==='suggestions'){proposals.push({id:'p1',source_id:'private',status:'pending',teacher_name:'Profe <script>',teacher_email:'profe@example.test',coreo:db.coreos[0]});return {id:'p1'};}
     if(action==='review-suggestion'){proposals[0].status=body.decision;return {ok:true};}
@@ -34,6 +34,17 @@ const assert=require('node:assert/strict');
   assert.equal(await page.$eval('#library-new',e=>e.checked),true);
   assert.equal(await page.$$eval('#library-list input',es=>es.length),1);
   assert((await page.$eval('#library-list',e=>e.textContent)).includes('NUEVA'));
+  await page.click('[data-ignore="new"]');
+  await page.waitForFunction(()=>document.getElementById('cloud-notifications').hidden);
+  assert.equal(await page.evaluate(()=>db.coreos.some(c=>c.libraryId==='new')),false);
+  await page.click('#library-new');
+  assert((await page.$eval('#library-list',e=>e.textContent)).includes('Nueva'));
+  await page.evaluate(()=>{document.getElementById('modal').close();noticeRevision++;return cloudRefreshNotifications();});
+  await page.click('[data-new-coreos]');await page.waitForSelector('[data-ignore="new"]');
+  await page.click('#library-ignore-all');
+  await page.waitForFunction(()=>document.getElementById('cloud-notifications').hidden);
+  await page.evaluate(()=>{document.getElementById('modal').close();noticeRevision++;return cloudRefreshNotifications();});
+  await page.click('[data-new-coreos]');await page.waitForSelector('[data-ignore="new"]');
   await page.click('#library-all');await page.click('#form [type=submit]');
   await page.waitForFunction(()=>!document.getElementById('modal').open);
   assert.equal(await page.evaluate(()=>db.coreos.some(c=>c.name==='Nueva'&&c.libraryId==='new')),true);
@@ -51,6 +62,6 @@ const assert=require('node:assert/strict');
   assert.equal(await page.evaluate(()=>proposals[0].status),'accepted');
   assert.equal(await page.$('[data-pending-suggestions]'),null);
   assert.deepEqual(errors,[]);
-  console.log('OK: aviso, lista de novedades, copia privada, propuesta, autor, aprobación y escape de HTML. API simulada.');
+  console.log('OK: ignorar una o todas, volver a compartir, aviso, copia privada, propuesta, autor, aprobación y escape de HTML. API simulada.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

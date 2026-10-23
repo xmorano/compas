@@ -21,3 +21,8 @@ La instalación nativa en teléfonos Android/iOS y los tipos MIME del HostGator 
 Comprobado en Chrome real con API simulada (`tests/catalog_notifications_test.cjs`): aviso de novedades, filtro de nuevas fichas, copia privada, retirada del aviso, propuesta de profesor, identificación del autor, aprobación y escape de contenido HTML. Sintaxis JavaScript y generación de paquetes comprobadas.
 
 Se han ampliado `tests/api_test.py` y `tests/prepare.php` para comprobar novedades por cuenta, versiones publicadas, CSRF, aislamiento de propuestas, selección exclusiva de fichas propias, aprobación única, descarte e independencia de las copias. Estas nuevas pruebas de API no se han ejecutado en esta sesión: el entorno no dispone de PHP. Sigue pendiente la validación de integración PHP/MySQL y la ejecución de la migración en el hosting. Esta actualización no se ha desplegado.
+
+
+## Ignorados por publicación (23 de octubre de 2026)
+
+Prueba en Chrome con API simulada superada: ignorar una novedad, ignorar las visibles, conservación en el catálogo completo, reaparición al volver a compartir e importación independiente posterior. La prueba existente de propuestas y revisión también pasa. Sintaxis JavaScript y Python comprobadas. Las pruebas de API ampliadas cubren aislamiento de ignorados, rechazo de versiones futuras, CSRF y mantenimiento del aviso ante una confirmación de una publicación anterior; no ejecutadas por falta de PHP en el entorno. La integración PHP/MySQL en hosting sigue pendiente.

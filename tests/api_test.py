@@ -4,6 +4,8 @@ class Client:
  def __init__(self):
   self.opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()));self.csrf=''
  def call(self,action,body=None,expected=200,csrf=None):
+  if action in ('library-seen','library-ignore') and body is not None and 'versions' not in body and all(isinstance(i,str) for i in body.get('ids',[])):
+   body={**body,'versions':{c['id']:c.get('publicationVersion',0) for c in self.call('library')['coreos'] if c['id'] in body['ids']}}
   headers={'Content-Type':'application/json','X-CSRF-Token':self.csrf if csrf is None else csrf}
   req=urllib.request.Request(BASE+action,data=None if body is None else json.dumps(body).encode(),headers=headers)
   try:r=self.opener.open(req)
@@ -44,14 +46,14 @@ assert teacher.call('workspace')['data']==private
 bad={**empty,'groups':[{'id':'g','center':'missing','level':'Inicial','day':'Lunes','start':'19:00','end':'20:00'}]}
 teacher.call('workspace',{'version':1,'data':bad},expected=400)
 teacher.call('workspace',{'version':1,'data':empty},expected=403,csrf='invalid')
-# Unread publications are per account, survive login, and ignore edits to seen IDs.
+# Unread publications are per account; sharing the same routine again generates a fresh notice.
 assert teacher.call('notifications')['newCoreos']==1
 teacher.call('library-seen',{'ids':['coreo1']})
 teacher.call('library-seen',{'ids':['coreo1']})
 assert teacher.call('notifications')['newCoreos']==0
-assert admin.call('notifications')['newCoreos']==1
+assert admin.call('notifications')['newCoreos']==0
 admin.call('library',{'version':1,'coreos':[{**coreo,'name':'Baile común actualizado'}]})
-assert teacher.call('library')['unseenIds']==[]
+assert teacher.call('library')['unseenIds']==['coreo1']
 admin.call('library',{'version':2,'coreos':[{**coreo,'id':'coreo2','name':'Segunda publicación'}]})
 assert len(teacher.call('library')['coreos'])==2
 assert next(c for c in teacher.call('library')['coreos'] if c['id']=='coreo1')['name']=='Baile común actualizado'
@@ -93,6 +95,23 @@ third.call('claim',{'token':third_token,'name':'Otra profe','password':'Third-te
 assert third.call('suggestions')['suggestions']==[]
 assert third.call('notifications')['newCoreos']==3
 assert teacher.call('notifications')['newCoreos']==2
+# Ignoring affects only this account and publication; a stale dismissal cannot hide a re-share.
+old=teacher.call('library')
+old_version=next(c['publicationVersion'] for c in old['coreos'] if c['id']=='coreo2')
+teacher.call('library-ignore',{'ids':['coreo2']})
+assert 'coreo2' not in teacher.call('library')['unseenIds']
+assert 'coreo2' in third.call('library')['unseenIds']
+assert any(c['id']=='coreo2' for c in teacher.call('library')['coreos'])
+assert teacher.call('workspace')['data']==private
+admin.call('library',{'version':old['version'],'coreos':[{**coreo,'id':'coreo2','name':'Segunda publicación'}]})
+assert 'coreo2' in teacher.call('library')['unseenIds']
+teacher.call('library-ignore',{'ids':['coreo2'],'versions':{'coreo2':old_version}})
+assert 'coreo2' in teacher.call('library')['unseenIds']
+teacher.call('library-ignore',{'ids':['coreo2'],'versions':{'coreo2':999999}},expected=400)
+teacher.call('library-ignore',{'ids':['coreo2']},csrf='invalid',expected=403)
+teacher.call('library-ignore',{'ids':['coreo2']})
+assert 'coreo2' not in teacher.call('library')['unseenIds']
+assert admin.call('notifications')['newCoreos']==0
 # An empty publication never clears existing shared routines; stale versions still fail.
 before=admin.call('library')
 admin.call('library',{'version':before['version'],'coreos':[]})

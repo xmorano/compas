@@ -73,7 +73,7 @@ sw=(ROOT/'server/pwa/sw.js').read_text().replace('__BUILD_VERSION__',version).re
 (out/'sw.js').write_text(sw)
 package=ROOT/'dist'/'compas-hostgator.zip'
 with zipfile.ZipFile(package,'w',zipfile.ZIP_DEFLATED) as z:
-    for source,name in [(ROOT/'INSTALACION.md','INSTALACION.md'),(ROOT/'server/schema.sql','schema.sql'),(ROOT/'server/migration-catalog.sql','migration-catalog.sql'),(ROOT/'server/config.example.php','config.example.php')]:
+    for source,name in [(ROOT/'INSTALACION.md','INSTALACION.md'),(ROOT/'server/schema.sql','schema.sql'),(ROOT/'server/migration-catalog.sql','migration-catalog.sql'),(ROOT/'server/migration-catalog-notices.sql','migration-catalog-notices.sql'),(ROOT/'server/config.example.php','config.example.php')]:
         z.write(source,name)
     for path in sorted(out.rglob('*')):
         if path.is_file():z.write(path,path.relative_to(out.parent))
@@ -89,6 +89,7 @@ print(ROOT/'dist/compas-pwa-actualizacion.zip')
 # Specific update with API and additive SQL migration; no configuration or user data.
 with zipfile.ZipFile(ROOT/'dist'/'compas-catalogo-actualizacion.zip','w',zipfile.ZIP_DEFLATED) as z:
     z.write(ROOT/'server/migration-catalog.sql','migration-catalog.sql')
+    z.write(ROOT/'server/migration-catalog-notices.sql','migration-catalog-notices.sql')
     for name in ['index.html','style.css','assets/vadecountry-logo.png','app.js','cloud.js','cloud.css','sw.js','api/index.php','api/lib.php']:
         z.write(out/name,'clases/'+name)
 print(ROOT/'dist'/'compas-catalogo-actualizacion.zip')

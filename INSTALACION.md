@@ -243,7 +243,7 @@ Para actualizar una instalación existente, sube la interfaz del paquete `compas
 Los avisos aparecen dentro de Compás al entrar y se consultan cada minuto mientras la aplicación está visible. No se envían correos ni notificaciones del teléfono por estas novedades.
 
 - El aviso de coreografías nuevas abre el catálogo con **Solo coreografías nuevas** activado. Cada profesor puede seleccionar y copiar las fichas a su lista privada. Las copias mantienen su independencia.
-- Las novedades se recuerdan por cuenta en el servidor, también entre dispositivos. Copiar una ficha la marca como vista; también se pueden marcar todas las novedades cargadas como vistas sin importarlas. Las fichas que se publiquen después seguirán pendientes. Al instalar esta actualización, las fichas existentes se consideran novedades hasta que cada usuario las marque como vistas. Editar una ficha ya vista no genera otra novedad.
+- Las novedades se recuerdan por cuenta en el servidor, también entre dispositivos. Copiar una ficha la marca como vista; también se pueden marcar todas las novedades cargadas como vistas sin importarlas. Las fichas que se publiquen después seguirán pendientes. Al instalar esta actualización, las fichas existentes se consideran novedades hasta que cada usuario las marque como vistas. Editar una copia privada no genera novedades. Volver a publicar expresamente una ficha común sí genera un nuevo aviso, aunque conserve el mismo identificador.
 - En **Coreografías → Propuestas al catálogo** o **Mi cuenta → Proponer coreografía / Mis propuestas**, el profesor selecciona una ficha privada y envía una propuesta. Se guarda una copia de su ficha en ese momento, sin centros ni clases. La lista muestra si está pendiente, publicada o descartada. Una misma ficha solo se puede proponer una vez.
 - El administrador recibe un aviso con el número de propuestas pendientes. Desde él, o desde **Mi cuenta → Propuestas de profesores**, consulta nombre, correo y ficha de cada propuesta. Puede **Publicar en catálogo común** o **Descartar**. La publicación crea una entrada independiente y genera una novedad para los usuarios. Se rechaza una aprobación repetida y se evita publicar una propuesta con un nombre ya existente.
 
@@ -265,3 +265,20 @@ La publicación del catálogo común conserva en el servidor todas las fichas an
 La barra izquierda muestra debajo de la cuenta el hash corto del commit de código utilizado para generar la web. El hash completo figura al pasar el ratón. Para actualizarlo en el hosting, sube `index.html`, `cloud.css` y `sw.js` de `dist/clases/`. El push a GitHub no despliega automáticamente en HostGator.
 
 Cada cambio se registra con su motivo y se envía al remoto. Primero se hace commit del código, después se ejecuta `python3 tools/build.py` y se registran los paquetes en otro commit. La versión mostrada identifica el commit del código, no el de empaquetado, evitando una referencia circular. Una compilación con fuentes sin registrar añade el sufijo `-dev`.
+
+
+## Ignorar novedades y volver a compartir
+
+El administrador no recibe avisos de nuevas coreos del catálogo común; mantiene los avisos de propuestas de profesores pendientes. Cada publicación marca sus fichas como vistas para quien las publica.
+
+En el catálogo común, cada ficha nueva tiene **Ignorar** y existe **Ignorar novedades visibles** para descartar en bloque las novedades que coinciden con la búsqueda y los filtros. Ignorar no importa ni elimina la ficha: permanece accesible desactivando **Solo coreografías nuevas**. La preferencia se guarda por usuario en el servidor y se mantiene entre dispositivos. Si se publica de nuevo esa misma ficha, vuelve a generar un aviso. Una pantalla abierta antes de esa nueva publicación no puede ocultarla por error al ignorar la versión anterior.
+
+La publicación envía únicamente las fichas seleccionadas. El servidor conserva el resto del catálogo, sin generar nuevos avisos por las fichas que no se han vuelto a compartir. Las copias privadas existentes no se actualizan automáticamente.
+
+Para actualizar una instalación que ya tenga avisos y propuestas:
+
+1. Importa `server/migration-catalog-notices.sql` (también incluido en los ZIP completos y de catálogo) en la base de datos de Compás con phpMyAdmin. Solo añade `compas_library_receipts`; no borra datos. No subas el SQL al directorio público.
+2. Sube `api/index.php`, `api/lib.php`, `cloud.js`, `cloud.css`, `index.html` y `sw.js` de `dist/clases/` a sus mismas rutas en `public_html/clases/`. Conserva cualquier personalización de `$configPath` en `api/index.php`.
+3. Recarga la aplicación o acepta la actualización de la PWA.
+
+Las instalaciones nuevas usan `schema.sql`. La migración general `migration-catalog.sql` también incluye la nueva tabla y puede ejecutarse sin borrar las existentes. Las marcas de visto de la versión anterior se respetan para las fichas antiguas hasta su próxima publicación.

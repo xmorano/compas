@@ -168,30 +168,42 @@ function libraryCopies(catalog, selectedIds, own) {
   }).map(c=>({...c,id:crypto.randomUUID(),libraryId:c.id}));
 }
 async function cloudLibrary(onlyNew=false){
-  cloudDialog('Catálogo común',`<p class="sub">Copia coreografías a tu lista privada. Podrás modificarlas sin afectar al catálogo común ni a otros profesores.</p><label class="share-option"><input id="library-new" type="checkbox" ${onlyNew?'checked':''}><span>Solo coreografías nuevas</span></label><button type="button" class="text-button" id="library-seen">Marcar novedades como vistas</button><label for="library-search">Buscar por nombre</label><input id="library-search" type="search"><div class="card-actions"><button type="button" class="button secondary" id="library-all">Marcar todas</button><button type="button" class="button secondary" id="library-none">Desmarcar todas</button></div><div id="library-list" class="share-list">Cargando…</div><p id="library-count" class="sub" role="status"></p>`,async()=>{
+  cloudDialog('Catálogo común',`<p class="sub">Copia coreografías a tu lista privada. Si ignoras una novedad, no volverá a avisarte hasta que se comparta de nuevo. Siempre podrás encontrarla desactivando el filtro de novedades.</p><label class="share-option"><input id="library-new" type="checkbox" ${onlyNew?'checked':''}><span>Solo coreografías nuevas</span></label><button type="button" class="text-button" id="library-seen">Marcar novedades como vistas</button><label for="library-search">Buscar por nombre</label><input id="library-search" type="search"><div class="card-actions"><button type="button" class="button secondary" id="library-all">Marcar todas</button><button type="button" class="button secondary" id="library-none">Desmarcar todas</button><button type="button" class="button secondary" id="library-ignore-all" disabled>Ignorar novedades visibles</button></div><div id="library-list" class="share-list">Cargando…</div><p id="library-count" class="sub" role="status"></p>`,async()=>{
     const copies=libraryCopies(catalog,[...selected],db.coreos);
     if(!copies.length)throw new Error('Selecciona alguna coreografía que no esté en tu lista.');
     const previous=db.coreos;db.coreos=[...previous,...copies];
     try{save();}catch(error){db.coreos=previous;throw error;}
     document.getElementById('modal').close();render();toast(copies.length+' coreografías copiadas a tu lista');
-    try{await cloudApi('library-seen',{ids:copies.map(c=>c.libraryId)});await cloudRefreshNotifications();}catch(error){toast('Copias preparadas. No se pudo actualizar el aviso: '+error.message);}
+    try{await acknowledge('library-seen',copies.map(c=>c.libraryId));}catch(error){toast('Copias preparadas. No se pudo actualizar el aviso: '+error.message);}
   },'Copiar a mi lista');
   const target=cloudEl('library-list'),submit=document.querySelector('#form button[type="submit"]');submit.disabled=true;
-  let catalog=[],selected=new Set(),unseen=new Set();
+  let catalog=[],selected=new Set(),unseen=new Set(),ackBusy=false;
+  const versions=ids=>Object.fromEntries(catalog.filter(c=>ids.includes(c.id)).map(c=>[c.id,c.publicationVersion||0]));
   function visible(){return matchingRoutines(catalog,cloudEl('library-search').value).filter(c=>!cloudEl('library-new').checked||unseen.has(c.id));}
   function update(){
     const available=new Set(libraryCopies(catalog,catalog.map(c=>c.id),db.coreos).map(c=>c.libraryId));
-    target.innerHTML=visible().map(c=>`<label class="share-option"><input type="checkbox" value="${cloudEscape(c.id)}" ${available.has(c.id)?'':'disabled'} ${selected.has(c.id)?'checked':''}><span>${cloudEscape(c.name)}${unseen.has(c.id)?' · NUEVA':''}<small>${cloudEscape(c.level)} · ${cloudEscape(c.counts||'Counts pendientes')}${available.has(c.id)?'':' · Ya está en tu lista'}</small></span></label>`).join('')||'<div class="empty">No hay coreografías disponibles. El administrador puede añadirlas al catálogo común.</div>';
-    cloudEl('library-count').textContent=selected.size+' seleccionadas';submit.disabled=!selected.size;
+    target.innerHTML=visible().map(c=>`<div class="library-entry"><label class="share-option"><input type="checkbox" value="${cloudEscape(c.id)}" ${available.has(c.id)?'':'disabled'} ${selected.has(c.id)?'checked':''}><span>${cloudEscape(c.name)}${unseen.has(c.id)?' · NUEVA':''}<small>${cloudEscape(c.level)} · ${cloudEscape(c.counts||'Counts pendientes')}${available.has(c.id)?'':' · Ya está en tu lista'}</small></span></label>${unseen.has(c.id)?`<button type="button" class="text-button library-ignore" data-ignore="${cloudEscape(c.id)}" aria-label="Ignorar ${cloudEscape(c.name)}" ${ackBusy?'disabled':''}>Ignorar</button>`:''}</div>`).join('')||'<div class="empty">No hay coreografías con estos filtros.</div>';
+    cloudEl('library-count').textContent=selected.size+' seleccionadas';submit.disabled=!selected.size||ackBusy;
+    cloudEl('library-ignore-all').disabled=ackBusy||!visible().some(c=>unseen.has(c.id));
+    cloudEl('library-seen').disabled=ackBusy||!unseen.size;
+  }
+  async function acknowledge(action,ids){
+    await cloudApi(action,{ids,versions:versions(ids)});
+    if(target.isConnected){ids.forEach(id=>{unseen.delete(id);selected.delete(id);});update();}
+    await cloudRefreshNotifications();
+  }
+  async function dismiss(action,ids){
+    if(ackBusy||!ids.length)return;
+    ackBusy=true;update();
+    try{await acknowledge(action,ids);if(action==='library-ignore')toast(ids.length===1?'Coreografía ignorada hasta que se vuelva a compartir':'Novedades ignoradas hasta que se vuelvan a compartir');}
+    catch(error){toast(error.message);}finally{ackBusy=false;if(target.isConnected)update();}
   }
   target.onchange=e=>{if(e.target.matches('input')){if(e.target.checked)selected.add(e.target.value);else selected.delete(e.target.value);update();}};
+  target.onclick=event=>{const button=event.target.closest('[data-ignore]');if(button)dismiss('library-ignore',[button.dataset.ignore]);};
   cloudEl('library-search').oninput=update;
   cloudEl('library-new').onchange=()=>{selected.clear();update();};
-  cloudEl('library-seen').onclick=async event=>{
-    const button=event.currentTarget;button.disabled=true;
-    try{await cloudApi('library-seen',{ids:[...unseen]});if(target.isConnected){unseen.clear();selected.clear();update();}await cloudRefreshNotifications();}
-    catch(error){toast(error.message);}finally{if(button.isConnected)button.disabled=false;}
-  };
+  cloudEl('library-seen').onclick=()=>dismiss('library-seen',[...unseen]);
+  cloudEl('library-ignore-all').onclick=()=>dismiss('library-ignore',visible().filter(c=>unseen.has(c.id)).map(c=>c.id));
   cloudEl('library-all').onclick=()=>{libraryCopies(visible(),visible().map(c=>c.id),db.coreos).forEach(c=>selected.add(c.libraryId));update();};
   cloudEl('library-none').onclick=()=>{selected.clear();update();};
   try{const result=await cloudApi('library');if(!target.isConnected)return;unseen=new Set(result.unseenIds);catalog=result.coreos.sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base',numeric:true}));update();}catch(error){if(target.isConnected)target.textContent=error.message;}
@@ -200,9 +212,8 @@ async function cloudPublishLibrary(){
   cloudDialog('Gestionar catálogo común','<p class="sub">Elige coreografías de tu catálogo privado para añadir o actualizar sus fichas públicas. Se comparten nombre, autor, nivel, paredes, counts y enlaces. Las copias que ya tienen otros profesores no se modifican.</p><div class="card-actions"><button type="button" class="button secondary" id="publish-all">Marcar todas</button><button type="button" class="button secondary" id="publish-none">Desmarcar todas</button></div><div id="publish-list" class="share-list"></div><label class="share-option"><input type="checkbox" required><span>Quiero publicar estas fichas para todos los profesores de Compás.</span></label><p id="publish-info" class="sub"></p>',async()=>{
     const ids=[...document.querySelectorAll('[data-publish]:checked')].map(b=>b.value);
     if(!ids.length)throw new Error('Selecciona al menos una coreografía.');
-    const merged=new Map(library.coreos.map(c=>[c.id,c]));
-    for(const c of db.coreos.filter(c=>ids.includes(c.id))){const {libraryId,...copy}=c;copy.id=libraryId||c.id;merged.set(copy.id,copy);}
-    await cloudApi('library',{version:library.version,coreos:[...merged.values()]});document.getElementById('modal').close();toast('Catálogo común actualizado');await cloudRefreshNotifications();
+    const selection=db.coreos.filter(c=>ids.includes(c.id)).map(c=>{const {libraryId,publicationVersion,...copy}=c;copy.id=libraryId||c.id;return copy;});
+    await cloudApi('library',{version:library.version,coreos:selection});document.getElementById('modal').close();toast('Catálogo común actualizado');await cloudRefreshNotifications();
   },'Publicar selección');
   let library;
   const submit=document.querySelector('#form button[type="submit"]');submit.disabled=true;

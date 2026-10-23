@@ -87,17 +87,24 @@ try {
     if ($action==='notifications' && $method==='GET') {
         $library=libraryData();
         $pending=$u['role']==='admin' ? (int)query("SELECT COUNT(*) FROM compas_suggestions WHERE status='pending'")->fetchColumn() : 0;
-        reply(['newCoreos'=>count(unseenLibraryIds($u['id'],$library['coreos'])),'pendingSuggestions'=>$pending]);
+        reply(['newCoreos'=>$u['role']==='admin' ? 0 : count(unseenLibraryIds($u['id'],$library['coreos'])),'pendingSuggestions'=>$pending]);
     }
-    if ($action==='library-seen' && $method==='POST') {
+    if (in_array($action,['library-seen','library-ignore'],true) && $method==='POST') {
         $ids=$body['ids'] ?? null;
-        if (!is_array($ids) || !array_is_list($ids) || count($ids)>20000) fail('Lista no válida.');
-        foreach ($ids as $id) if (!is_string($id) || !preg_match('/^[a-zA-Z0-9_-]{1,100}$/D',$id)) fail('Identificador no válido.');
-        $available=array_fill_keys(array_column(libraryData()['coreos'],'id'),true);
+        $versions=$body['versions'] ?? [];
+        if (!is_array($ids) || !array_is_list($ids) || count($ids)>20000 || !is_array($versions)) fail('Lista no válida.');
+        foreach ($ids as $id) {
+            if (!is_string($id) || !preg_match('/^[a-zA-Z0-9_-]{1,100}$/D',$id)) fail('Identificador no válido.');
+            if (!is_int($versions[$id] ?? 0) || ($versions[$id] ?? 0)<0) fail('Versión no válida.');
+        }
+        $available=[];
+        foreach (libraryData()['coreos'] as $c) $available[$c['id']]=(int)($c['publicationVersion'] ?? 0);
         $pdo->beginTransaction();
         foreach (array_unique($ids) as $id) if (isset($available[$id])) {
-            $sql=$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql' ? 'INSERT IGNORE INTO compas_library_seen (user_id,coreo_id) VALUES (?,?)' : 'INSERT OR IGNORE INTO compas_library_seen (user_id,coreo_id) VALUES (?,?)';
-            query($sql,[$u['id'],$id]);
+            // A stale screen can acknowledge only the publication it actually displayed.
+            $version=$versions[$id] ?? 0;
+            if ($version>$available[$id]) { $pdo->rollBack(); fail('Versión de publicación no válida.'); }
+            recordLibraryReceipt($u['id'],$id,$version,$action==='library-ignore' ? 'ignored' : 'seen');
         }
         $pdo->commit(); reply(['ok'=>true]);
     }
@@ -135,10 +142,12 @@ try {
             $library=libraryData();
             foreach ($library['coreos'] as $existing) if (preg_replace('/\s+/u',' ',trim($existing['name'])) === preg_replace('/\s+/u',' ',trim($coreo['name'])) || strcasecmp(trim($existing['name']),trim($coreo['name']))===0) { $pdo->rollBack(); fail('Ya existe una coreografía con ese nombre en el catálogo común. Puedes descartar la propuesta.',409); }
             $coreo['id']='suggestion_'.$id;
+            $coreo['publicationVersion']=$library['version']+1;
             $library['coreos'][]=$coreo;
             validateWorkspace(['centers'=>[],'groups'=>[],'sessions'=>[],'coreos'=>$library['coreos']]);
             $saved=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($library['coreos'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$library['version']]);
             if ($saved->rowCount()!==1) { $pdo->rollBack(); fail('El catálogo ha cambiado. Vuelve a revisar la propuesta.',409); }
+            recordLibraryReceipt($u['id'],$coreo['id'],$coreo['publicationVersion'],'seen');
         }
         $pdo->commit(); reply(['ok'=>true]);
     }
@@ -146,15 +155,18 @@ try {
         if (!isset($body['version']) || !is_int($body['version'])) fail('Versión no válida.');
         $data=validateWorkspace(['centers'=>[], 'groups'=>[], 'sessions'=>[], 'coreos'=>$body['coreos'] ?? null]);
         // Publication is additive: omitted routines must remain in the shared catalog.
+        $pdo->beginTransaction();
         $library=libraryData();
         if ($library['version']!==$body['version']) fail('El catálogo común ha cambiado. Ciérralo y vuelve a abrirlo.',409);
         $merged=[];
         foreach ($library['coreos'] as $coreo) $merged[$coreo['id']]=$coreo;
-        foreach ($data['coreos'] as $coreo) $merged[$coreo['id']]=sharedCoreo($coreo);
+        foreach ($data['coreos'] as $coreo) $merged[$coreo['id']]=sharedCoreo($coreo)+['publicationVersion'=>$library['version']+1];
         $coreos=array_values($merged);
         validateWorkspace(['centers'=>[], 'groups'=>[], 'sessions'=>[], 'coreos'=>$coreos]);
         $changed=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($coreos,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$body['version']]);
         if ($changed->rowCount()!==1) fail('El catálogo común ha cambiado. Ciérralo y vuelve a abrirlo.',409);
+        foreach ($data['coreos'] as $coreo) recordLibraryReceipt($u['id'],$coreo['id'],$library['version']+1,'seen');
+        $pdo->commit();
         reply(['version'=>$body['version']+1]);
     }
 

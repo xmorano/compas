@@ -108,8 +108,23 @@ function libraryData(): array {
     return ['coreos'=>json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR),'version'=>(int)$row['version']];
 }
 function unseenLibraryIds(string $userId, array $coreos): array {
-    $seen=array_fill_keys(query('SELECT coreo_id FROM compas_library_seen WHERE user_id=?',[$userId])->fetchAll(PDO::FETCH_COLUMN),true);
-    return array_values(array_map(fn($c)=>$c['id'],array_filter($coreos,fn($c)=>!isset($seen[$c['id']]))));
+    $legacy=array_fill_keys(query('SELECT coreo_id FROM compas_library_seen WHERE user_id=?',[$userId])->fetchAll(PDO::FETCH_COLUMN),true);
+    $receipts=[];
+    foreach (query('SELECT coreo_id,publication_version FROM compas_library_receipts WHERE user_id=?',[$userId])->fetchAll() as $row) $receipts[$row['coreo_id']]=(int)$row['publication_version'];
+    return array_values(array_map(fn($c)=>$c['id'],array_filter($coreos, function($c) use ($legacy,$receipts) {
+        $version=(int)($c['publicationVersion'] ?? 0);
+        $read=$receipts[$c['id']] ?? (isset($legacy[$c['id']]) ? 0 : -1);
+        return $read<$version;
+    })));
+}
+function recordLibraryReceipt(string $userId, string $id, int $version, string $disposition): void {
+    global $pdo;
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql') {
+        $sql='INSERT INTO compas_library_receipts (user_id,coreo_id,publication_version,disposition) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE disposition=IF(VALUES(publication_version)>=publication_version,VALUES(disposition),disposition),publication_version=GREATEST(publication_version,VALUES(publication_version))';
+    } else {
+        $sql='INSERT INTO compas_library_receipts (user_id,coreo_id,publication_version,disposition) VALUES (?,?,?,?) ON CONFLICT(user_id,coreo_id) DO UPDATE SET publication_version=excluded.publication_version,disposition=excluded.disposition WHERE excluded.publication_version>=compas_library_receipts.publication_version';
+    }
+    query($sql,[$userId,$id,$version,$disposition]);
 }
 function sharedCoreo(array $coreo): array {
     return array_intersect_key($coreo,array_flip(['id','name','author','level','walls','counts','music','video','sheet','extras']));
