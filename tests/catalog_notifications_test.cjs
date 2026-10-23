@@ -10,6 +10,7 @@ const assert=require('node:assert/strict');
   let source=fs.readFileSync('server/cloud.js','utf8');
   source=source.slice(0,source.indexOf('(async()=>{try{'))+source.slice(source.indexOf('function libraryCopies'));
   await page.addScriptTag({content:source});
+  await page.addStyleTag({content:fs.readFileSync('server/cloud.css','utf8')});
   await page.evaluate(()=>{
    if(!crypto.randomUUID)crypto.randomUUID=()=> 'test-copy-'+Math.random().toString(16).slice(2);
    window.db={coreos:[{id:'private',name:'Mi coreo',level:'Inicial',music:'https://example.test/song',extras:'<img src=x onerror=alert(1)>'}]};
@@ -80,7 +81,7 @@ const assert=require('node:assert/strict');
   assert.equal(await page.$eval('#modal-title',e=>e.textContent),'Compartir coreografía');
   assert.equal(await page.evaluate(()=>calls.filter(c=>c.action==='library'&&c.body).length),publicationsBefore);
   await page.evaluate(()=>document.getElementById('modal').close());
-  await page.click('#test-share-card');await page.click('#form [type=submit]');
+  await page.click('#test-share-card button');await page.click('#form [type=submit]');
   await page.waitForFunction(()=>!document.getElementById('modal').open);
   const publication=await page.evaluate(()=>calls.filter(c=>c.action==='library'&&c.body).at(-1));
   assert.equal(publication.body.coreos.length,1);assert.equal(publication.body.coreos[0].id,'private');
