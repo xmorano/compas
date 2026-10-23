@@ -73,6 +73,25 @@ const assert=require('node:assert/strict');
   assert.equal(await page.$('#cloud-admin'),null);
   assert.equal(await page.$eval('#modal',e=>e.open),false);
   await page.evaluate(()=>cloudAccount());assert(await page.$('#account-suggestions'));
+  // Card action confirms before any write and selects the endpoint by role.
+  await page.evaluate(()=>{document.getElementById('modal').close();cloudUser.role='admin';const holder=document.createElement('div');holder.id='test-share-card';holder.innerHTML=cloudShareCoreoButton(db.coreos[0]);document.body.append(holder);});
+  const publicationsBefore=await page.evaluate(()=>calls.filter(c=>c.action==='library'&&c.body).length);
+  await page.click('#test-share-card svg');
+  assert.equal(await page.$eval('#modal-title',e=>e.textContent),'Compartir coreografía');
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.action==='library'&&c.body).length),publicationsBefore);
+  await page.evaluate(()=>document.getElementById('modal').close());
+  await page.click('#test-share-card');await page.click('#form [type=submit]');
+  await page.waitForFunction(()=>!document.getElementById('modal').open);
+  const publication=await page.evaluate(()=>calls.filter(c=>c.action==='library'&&c.body).at(-1));
+  assert.equal(publication.body.coreos.length,1);assert.equal(publication.body.coreos[0].id,'private');
+  await page.evaluate(()=>{cloudUser.role='teacher';db.coreos.push({id:'candidate',name:'Otra coreo',level:'Inicial'});document.getElementById('test-share-card').innerHTML=cloudShareCoreoButton(db.coreos.at(-1));});
+  const proposalsBefore=await page.evaluate(()=>calls.filter(c=>c.action==='suggestions'&&c.body).length);
+  await page.click('#test-share-card svg');
+  assert.equal(await page.$eval('#modal-title',e=>e.textContent),'Sugerir coreografía');
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.action==='suggestions'&&c.body).length),proposalsBefore);
+  await page.click('#form [type=submit]');await page.waitForFunction(()=>!document.getElementById('modal').open);
+  const suggestion=await page.evaluate(()=>calls.filter(c=>c.action==='suggestions'&&c.body).at(-1));
+  assert.equal(suggestion.body.source_id,'candidate');
   assert.deepEqual(errors,[]);
   console.log('OK: ignorar una o todas, volver a compartir, aviso, copia privada, propuesta, autor, aprobación y escape de HTML. API simulada.');
  }finally{await browser.close();}

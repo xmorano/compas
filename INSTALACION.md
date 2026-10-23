@@ -285,3 +285,6 @@ Las instalaciones nuevas usan `schema.sql`. La migración general `migration-cat
 
 
 El acceso **Administración** está en la navegación izquierda y solo se muestra a administradores. Agrupa profesores e invitaciones, catálogo común y propuestas. **Mi cuenta** conserva las opciones personales de contraseña, importación y cierre de sesión.
+
+
+En la vista **Coreografías**, cada ficha de la edición online incluye un icono de compartir. Para el administrador abre una confirmación para publicar únicamente esa ficha en el catálogo común. Para los profesores abre una confirmación para sugerirla al administrador. Cancelar no publica ni envía nada. Las propuestas se revisan en **Administración → Propuestas de profesores**, donde figura quién la ha enviado, con su nombre y correo.

@@ -320,3 +320,35 @@ async function cloudSuggestions(){
   };
   try{await load();}catch(error){if(target.isConnected)target.textContent=error.message;}
 }
+
+function cloudShareCoreoButton(coreo){
+  const label=(cloudUser.role==='admin'?'Compartir en el catálogo común: ':'Sugerir al catálogo común: ')+coreo.name;
+  return `<button type="button" class="coreo-share-button" data-share-coreo="${cloudEscape(coreo.id)}" title="${cloudEscape(label)}" aria-label="${cloudEscape(label)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m9 10 6-3m-6 7 6 3"/></svg></button>`;
+}
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-share-coreo]');
+  if(button)cloudShareCoreo(button.dataset.shareCoreo);
+});
+function cloudShareCoreo(id){
+  const source=db.coreos.find(c=>c.id===id);if(!source)return;
+  const admin=cloudUser.role==='admin';
+  cloudDialog(admin?'Compartir coreografía':'Sugerir coreografía',
+    `<p class="sub">${admin?'¿Quieres publicar esta coreografía en el catálogo común? Los profesores podrán copiarla a su espacio privado. Si ya estaba compartida, se actualizará y generará un nuevo aviso.':'¿Quieres sugerir esta coreografía para el catálogo común? El administrador verá tu nombre, correo y la ficha, y decidirá si la publica.'}</p><div class="suggestion-card"><h3>${cloudEscape(source.name)}</h3>${cloudSuggestionDetails(source)}</div>`,async()=>{
+      const current=db.coreos.find(c=>c.id===id);
+      if(!current)throw new Error('Esta coreografía ya no está en tu lista.');
+      if(admin){
+        const library=await cloudApi('library');
+        const {libraryId,publicationVersion,...copy}=current;copy.id=libraryId||current.id;
+        await cloudApi('library',{version:library.version,coreos:[copy]});
+      }else{
+        if(cloudFailure)throw new Error('Resuelve el error de guardado antes de enviar la propuesta.');
+        if(cloudBusy)throw new Error('Espera a que termine el guardado antes de enviar la propuesta.');
+        await cloudFlush();
+        if(cloudFailure||cloudPending||cloudBusy)throw new Error('Espera a que se guarden los cambios antes de enviar la propuesta.');
+        await cloudApi('suggestions',{source_id:id});
+      }
+      document.getElementById('modal').close();
+      toast(admin?'Coreografía compartida en el catálogo común':'Propuesta enviada al administrador');
+      await cloudRefreshNotifications();
+    },admin?'Confirmar publicación':'Confirmar sugerencia');
+}

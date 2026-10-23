@@ -19,6 +19,7 @@ a=s.index('let db;try{');b=s.index("let page='agenda'",a)
 s=s[:a]+'let db=structuredClone(window.COMPAS_INITIAL_DATA);'+s[b:]
 s=s.replace("function save(){localStorage.setItem('compas-v1',JSON.stringify(db))}", 'function save(){window.cloudSave(db)}')
 s=s.replace("toast('Cambios guardados')", "toast('Cambios preparados para guardar')")
+s=s.replace('<div class="card-actions"><button class="button secondary" data-edit-coreo="${c.id}">', '<div class="card-actions">${cloudShareCoreoButton(c)}<button class="button secondary" data-edit-coreo="${c.id}">')
 s=s.replace('<div class="toolbar"><button class="button secondary" data-action="import-csv">', '<div class="toolbar"><button class="button secondary" type="button" onclick="cloudLibrary()">Catálogo común</button><button class="button secondary" type="button" onclick="cloudSuggestions()">Propuestas al catálogo</button><button class="button secondary" data-action="import-csv">')
 s=s.replace('◉ Datos de ejemplo para explorar tu estudio. Puedes editarlos y crear tus propios centros y clases.','◉ Tu espacio es privado. Empieza creando tus centros y cursos.')
 # Cloud edition always uses the teacher's own WhatsApp sharing flow.
