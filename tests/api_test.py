@@ -170,4 +170,21 @@ invalid={**attendance_workspace,'students':[{**attendance_workspace['students'][
 third.call('workspace',{'version':v,'data':invalid},expected=400)
 assert third.call('workspace')['data']==attendance_workspace
 assert admin.call('workspace')['data']==empty
+# One profile can belong to multiple groups; former memberships preserve historical attendance.
+profile={'id':'student-one','name':'Ana','active':True,'groups':['attendance-group','different-group'],'pastGroups':[],
+ 'phone':'600123456','email':'ana@example.test','photo':'https://example.test/ana.jpg','level':'Intermedio','notes':'Nota privada'}
+expanded={**attendance_workspace,'studentsEnabled':True,'students':[profile,attendance_workspace['students'][1]],
+ 'sessions':[attendance_workspace['sessions'][0],{**attendance_workspace['sessions'][0],'id':'second-attendance','group':'different-group','attendance':[{'student':'student-one','status':'absent'}]}]}
+v=third.call('workspace')['version'];third.call('workspace',{'version':v,'data':expanded})
+assert third.call('workspace')['data']==expanded
+expanded['students'][0]={**profile,'groups':['different-group'],'pastGroups':['attendance-group']}
+expanded['studentsEnabled']=False
+v=third.call('workspace')['version'];third.call('workspace',{'version':v,'data':expanded})
+assert third.call('workspace')['data']==expanded
+v=third.call('workspace')['version']
+for change in [{'groups':['different-group','different-group']},{'groups':['foreign-group']},{'email':'bad-email'},{'photo':'data:image/svg+xml;base64,PHN2Zz4='},{'phone':'x'*81}]:
+ invalid={**expanded,'students':[{**expanded['students'][0],**change},expanded['students'][1]]}
+ third.call('workspace',{'version':v,'data':invalid},expected=400)
+third.call('workspace',{'version':v,'data':{**expanded,'studentsEnabled':'yes'}},expected=400)
+assert third.call('workspace')['data']==expanded
 print('API: cuentas, invitaciones de un uso, permisos, aislamiento, catálogo común, copias privadas, conflictos, validación, CSRF, recuperación y cierre correctos.')

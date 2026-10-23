@@ -8,14 +8,16 @@ const puppeteer=require('/home/xmorano/Work/Eventos/whatsapp-service/node_module
   const item=(coreo,mode='Nueva',done=true,planned=true)=>({coreo,mode,done,planned,note:''});
   const session=(id,date,items,group='g')=>({id,date,group,items,start:'19:00',end:'20:00',term:'T1',closed:true});
   db={centers:[{id:'center',name:'Centro de prueba',address:'Calle'}],groups:[{id:'g',center:'center',level:'Inicial',day:'Lunes',start:'19:00',end:'20:00',total:8},{id:'other',center:'center',level:'Otro',day:'Lunes',start:'19:00',end:'20:00',total:8}],coreos:[{id:'a',name:'Antigua',level:'Inicial'},{id:'b',name:'Pendiente',level:'Inicial'},{id:'c',name:'Reciente',level:'Inicial'},{id:'d',name:'Clase actual',level:'Inicial',sheet:'https://example.test/hoja',video:'https://example.test/video'}],sessions:[session('old','2026-09-01',[item('a')]),session('recent','2026-10-15',[item('c')]),session('pending','2026-10-20',[item('b','Nueva',false)]),session('future','2026-10-25',[item('b')]),session('other-class','2026-10-22',[item('a')],'other'),session('current','2026-10-23',[{...item('d'),note:'SECRETO privado'}])]};
-  activeSession='current';render();
+  db.studentsEnabled=true;activeSession='current';render();
  });
  assert.deepEqual(await p.evaluate(()=>classRecommendations(db.sessions.at(-1)).map(r=>r.coreo)),['b','c','a']);
  await p.click('.class-suggestions summary');await p.click('[data-class-suggest=b]');
  assert.equal(await p.evaluate(()=>db.sessions.at(-1).items.filter(i=>i.coreo==='b').length),1);
  assert.equal(await p.evaluate(()=>db.sessions.at(-1).items.find(i=>i.coreo==='b').done),false);
  await p.click('.class-suggestions summary');await p.click('[data-class-suggest=a]');
- await p.click('[data-class-tool=attendance]');await p.click('#attendance-roster');await p.type('#student-new','Ana\nLuis');await p.click('#form [type=submit]');
+ await p.click('[data-class-tool=attendance]');await p.click('#attendance-roster');
+ for(const name of ['Ana','Luis']){await p.click('#student-add');await p.type('#f-student-name',name);await p.click('#form [type=submit]');}
+ await p.evaluate(()=>{page='agenda';activeSession='current';render();});
  assert.equal(await p.evaluate(()=>db.students.length),2);
  await p.click('[data-class-tool=attendance]');
  const students=await p.evaluate(()=>db.students.map(s=>({id:s.id,name:s.name})));

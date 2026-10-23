@@ -343,9 +343,9 @@ Muestra las coreografías en el orden guardado de esa clase y permite subirlas y
 
 ### Alumnos y asistencia
 
-En **Centros y grupos → Alumnos** puedes añadir nombres (uno por línea), corregirlos, activar/desactivar y consultar su historial. También se accede desde **Asistencia → Gestionar alumnos**. No se recogen correos ni teléfonos. Cada grupo admite hasta 1000 alumnos y la cuenta hasta 5000. Desactivar conserva la asistencia anterior; no elimina al alumno.
+En **Alumnos**, disponible en el menú izquierdo, puedes activar opcionalmente la gestión, crear una ficha por persona y asignarla a varios grupos o centros. Las fichas admiten nombre, teléfono, correo, foto, nivel y notas; solo el nombre es obligatorio. Cada grupo admite hasta 1000 alumnos y la cuenta hasta 5000. Desactivar un alumno conserva su asistencia anterior. También se accede con el grupo filtrado desde **Centros y grupos → Alumnos** o **Asistencia → Gestionar alumnos**.
 
-En cada clase se registran **Presente**, **Ausente**, **Justificada** o **Sin marcar**. Sin marcar no se interpreta como ausencia. Hay controles para todos presentes o limpiar las marcas. El historial de un alumno muestra su asistencia y las coreografías nuevas realizadas en esas clases; permite identificar qué enseñanzas se perdió. Cambiar el grupo de una clase limpia su asistencia, con aviso en el formulario, para evitar mezclar alumnos. Eliminar un centro elimina también los alumnos de sus grupos junto con sus clases.
+En cada clase se registran **Presente**, **Ausente**, **Justificada** o **Sin marcar**. Sin marcar no se interpreta como ausencia. Hay controles para todos presentes o limpiar las marcas. El historial de un alumno muestra su asistencia y las coreografías nuevas realizadas en esas clases; permite identificar qué enseñanzas se perdió. Cambiar el grupo de una clase limpia su asistencia, con aviso en el formulario, para evitar mezclar alumnos. Eliminar un centro elimina sus grupos y clases, y quita esas inscripciones de los alumnos, pero conserva sus fichas y sus inscripciones en otros centros.
 
 Los alumnos se guardan en la lista opcional `students` del JSON privado y la asistencia en `sessions[].attendance`; las copias antiguas sin esos campos siguen siendo válidas. La API valida identificadores, estados, duplicados y que el alumno pertenezca al grupo de la clase. Se incluyen en las copias de seguridad y al importarlas, pero nunca se publican en el catálogo común.
 
@@ -358,3 +358,18 @@ No incluye nombres de alumnos, asistencia ni notas privadas. No adjunta ni publi
 ### Actualizar estas cuatro mejoras
 
 Usa **`dist/compas-clases-actualizacion.zip`**: sube su carpeta `clases/` a `/public_html/clases/`, respetando las subcarpetas. Contiene `app.js`, `style.css`, `cloud.js`, `cloud.css`, `index.html`, `sw.js` y **`api/lib.php`**. No requiere SQL ni sustituir `api/index.php` o la configuración privada. Es imprescindible actualizar `api/lib.php` para que el servidor acepte y conserve alumnos y asistencia. Después recarga o acepta la actualización de la PWA.
+
+
+## Alumnos opcionales y fichas compartidas entre grupos de la misma cuenta
+
+La sección **Alumnos** aparece en el menú izquierdo de cada profesor. La gestión está desactivada inicialmente para cuentas sin alumnos; pulsa **Activar gestión de alumnos** para empezar. Si ya había alumnos registrados con la versión anterior, la gestión sigue activa y conserva sus identificadores y asistencias. **Desactivar gestión de alumnos** oculta la asistencia y accesos de alumnos en grupos y clases, sin borrar datos. La organización de coreos, clases, música y resúmenes funciona igualmente sin activar alumnos.
+
+Cada alumno tiene una ficha única dentro de la cuenta del profesor, con nombre (obligatorio), teléfono, correo, foto, nivel, notas privadas y estado activo/inactivo. Puede no tener inscripciones o pertenecer a varios grupos del mismo centro o de centros distintos. Las personas no se comparten automáticamente entre profesores.
+
+La pantalla permite buscar por nombre, teléfono, correo o nivel, y filtrar por grupo, sin inscripciones y activos/inactivos. El editor de cada ficha tiene una lista de grupos con selección múltiple. Al filtrar un grupo, **Gestionar inscripciones del grupo** permite inscribir personas que ya existen sin crear nuevas fichas, conservando sus otras inscripciones. Retirar una inscripción mantiene las marcas de asistencia anteriores y el historial. Cada clase continúa registrando su propia asistencia: la misma persona puede estar presente en varias clases o centros el mismo día.
+
+La foto admite enlace HTTP/HTTPS o archivo JPG/PNG/WebP de hasta 8 MB. Al subirla, el navegador la reduce a un máximo de 256 píxeles y la convierte a JPEG antes de guardarla en el JSON privado (máximo 150 KB por imagen codificada). Los enlaces externos dependen de que la imagen siga disponible. Las fichas y fotos se incluyen en las copias JSON; no aparecen en el catálogo común ni en los resúmenes para alumnos.
+
+El JSON acepta `studentsEnabled` como preferencia opcional y perfiles con `groups` y `pastGroups` para inscripciones actuales e históricas. Se siguen leyendo perfiles antiguos con `group` único; al editarlos pasan al formato múltiple. El historial abarca todas las clases con asistencia de esa persona y muestra el centro/grupo. No hace falta migrar SQL.
+
+Para instalar, usa **`dist/compas-clases-actualizacion.zip`** o sube sus archivos de `clases/` a las mismas rutas: `index.html`, `app.js`, `style.css`, `cloud.js`, `cloud.css`, `sw.js` y **`api/lib.php`**. No se modifica la configuración privada ni `api/index.php`. Actualiza la interfaz y la validación del servidor juntas para conservar los campos de las fichas y las inscripciones múltiples.
