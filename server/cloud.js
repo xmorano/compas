@@ -39,7 +39,7 @@ async function cloudFlush() {
   try {
     const result=await cloudApi('workspace',{version:cloudVersion,data:JSON.parse(snapshot)});
     cloudVersion=result.version;
-    if(cloudPending===snapshot){cloudPending=null;localStorage.removeItem(cloudCacheKey());cloudStatus('● Guardado en tu cuenta');}
+    if(cloudPending===snapshot){cloudPending=null;localStorage.removeItem(cloudCacheKey());cloudStatus('● Guardado en tu cuenta');cloudRefreshCoreoStates();}
     else localStorage.setItem(cloudCacheKey(),JSON.stringify({version:cloudVersion,data:JSON.parse(cloudPending)}));
   } catch(error) {cloudFailure=error;cloudStatus(error.message,true);}
   finally {cloudBusy=false;if(cloudPending&&!cloudFailure)cloudFlush();}
