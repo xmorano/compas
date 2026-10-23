@@ -86,7 +86,7 @@ try {
     }
     if ($action==='notifications' && $method==='GET') {
         $library=libraryData();
-        $pending=$u['role']==='admin' ? (int)query("SELECT COUNT(*) FROM compas_suggestions WHERE status='pending'")->fetchColumn() : 0;
+        $pending=$u['role']==='admin' ? (int)query("SELECT COUNT(*) FROM compas_suggestions WHERE status='pending' AND user_id<>?",[$u['id']])->fetchColumn() : 0;
         reply(['newCoreos'=>$u['role']==='admin' ? 0 : count(unseenLibraryIds($u['id'],$library['coreos'])),'pendingSuggestions'=>$pending]);
     }
     if (in_array($action,['library-seen','library-ignore'],true) && $method==='POST') {
@@ -109,8 +109,8 @@ try {
         $pdo->commit(); reply(['ok'=>true]);
     }
     if ($action==='suggestions' && $method==='GET') {
-        $where=$u['role']==='admin' ? '' : ' WHERE s.user_id=?';
-        $rows=query('SELECT s.*,u.name AS teacher_name,u.email AS teacher_email FROM compas_suggestions s JOIN compas_users u ON u.id=s.user_id'.$where.' ORDER BY s.created_at DESC,s.id', $u['role']==='admin' ? [] : [$u['id']])->fetchAll();
+        $where=$u['role']==='admin' ? ' WHERE s.user_id<>?' : ' WHERE s.user_id=?';
+        $rows=query('SELECT s.*,u.name AS teacher_name,u.email AS teacher_email FROM compas_suggestions s JOIN compas_users u ON u.id=s.user_id'.$where.' ORDER BY s.created_at DESC,s.id', [$u['id']])->fetchAll();
         foreach ($rows as &$row) { $row['coreo']=json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR); unset($row['payload']); }
         unset($row); reply(['suggestions'=>$rows]);
     }

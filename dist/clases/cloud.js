@@ -273,8 +273,10 @@ async function cloudRefreshNotifications(){
   cloudNotificationBusy=true;
   try{
     const notices=await cloudApi('notifications'),banner=cloudEl('cloud-notifications');
-    banner.innerHTML=(notices.newCoreos?`<button type="button" class="button secondary" data-new-coreos>${notices.newCoreos} coreografías nuevas en el catálogo común · Ver e importar</button>`:'')+(notices.pendingSuggestions?`<button type="button" class="button secondary" data-pending-suggestions>${notices.pendingSuggestions} propuestas de profesores pendientes · Revisar</button>`:'');
-    banner.hidden=!notices.newCoreos&&!notices.pendingSuggestions;
+    const newCoreos=cloudUser.role==='admin'?0:notices.newCoreos;
+    const pendingSuggestions=cloudUser.role==='admin'?notices.pendingSuggestions:0;
+    banner.innerHTML=(newCoreos?`<button type="button" class="button secondary" data-new-coreos>${newCoreos} coreografías nuevas en el catálogo común · Ver e importar</button>`:'')+(pendingSuggestions?`<button type="button" class="button secondary" data-pending-suggestions>${pendingSuggestions} propuestas de profesores pendientes · Revisar</button>`:'');
+    banner.hidden=!newCoreos&&!pendingSuggestions;
   }catch(error){
     const banner=cloudEl('cloud-notifications');
     if(banner){banner.hidden=false;banner.textContent='No se pudieron consultar los avisos. '+error.message;}
@@ -307,7 +309,7 @@ async function cloudSuggestions(){
   }
   async function load(){
     const result=await cloudApi('suggestions');if(!target.isConnected)return;
-    const suggestions=result.suggestions;
+    const suggestions=result.suggestions.filter(s=>!admin||s.user_id!==cloudUser.id);
     const status={pending:'Pendiente',accepted:'Publicada',rejected:'Descartada'};
     target.innerHTML='<h3>'+(admin?'Pendientes de revisión':'Mis propuestas')+'</h3>'+suggestions.filter(s=>!admin||s.status==='pending').map(s=>`<article class="suggestion-card"><h4>${e(s.coreo.name)}</h4><p class="sub">${admin?`Propuesta por ${e(s.teacher_name)} · ${e(s.teacher_email)} · `:''}${e(status[s.status])}</p>${cloudSuggestionDetails(s.coreo)}${admin?`<div class="card-actions"><button type="button" class="button" data-review="accepted" data-suggestion="${e(s.id)}">Publicar en catálogo común</button><button type="button" class="button secondary" data-review="rejected" data-suggestion="${e(s.id)}">Descartar</button></div>`:''}</article>`).join('')+(suggestions.filter(s=>!admin||s.status==='pending').length?'':'<p class="empty">No hay propuestas.</p>');
     if(!admin){const proposed=new Set(suggestions.map(s=>s.source_id));for(const option of cloudEl('suggestion-source').options)option.disabled=proposed.has(option.value);if(proposed.has(cloudEl('suggestion-source').value)){cloudEl('suggestion-source').value='';cloudEl('suggestion-preview').innerHTML='';}submit.disabled=![...cloudEl('suggestion-source').options].some(o=>o.value&&!o.disabled);}
