@@ -300,7 +300,7 @@ async function cloudInspectTeacher(id){
     target.innerHTML=`<h3>${e(user.name)}</h3><p class="sub">${e(user.email)}</p>`+
       section('Centros',data.centers.map(c=>`<p><strong>${e(c.name)}</strong><br>${e(c.address)}</p>`))+
       section('Cursos',data.groups.map(g=>`<p><strong>${e(course(g))}</strong><br>${e(g.day)} · ${e(g.start)}–${e(g.end)}</p>`))+
-      section('Coreografías',data.coreos.map(c=>`<details><summary>${e(c.name)} · ${e(c.level)}</summary><p>${e(c.author)} · ${e(c.counts)} counts · ${e(c.walls)} paredes</p>${['music','video','sheet'].map(k=>{try{const url=new URL(c[k]);return ['https:','http:'].includes(url.protocol)?`<p><a href="${e(url.href)}" target="_blank" rel="noopener noreferrer">${{music:'Música',video:'Vídeo',sheet:'Hoja'}[k]}</a></p>`:'';}catch{return '';}}).join('')}<p>${e(c.extras)}</p></details>`))+
+      section('Coreografías',data.coreos.map(c=>`<details><summary>${e(c.name)} · ${e(c.level)}</summary><p>${e(c.author)} · ${e(c.counts)} counts · ${e(c.walls)} paredes</p>${['music','video','sheet'].map(k=>{try{const url=new URL(c[k]);return ['https:','http:'].includes(url.protocol)?`<p><a href="${e(url.href)}" target="_blank" rel="noopener noreferrer">${{music:'Música',video:'Vídeo',sheet:'Hoja'}[k]}</a></p>`:'';}catch{return '';}}).join('')}<div class="extras-rich">${extrasHtml(c.extras)}</div></details>`))+
       section('Clases', [...data.sessions].sort((a,b)=>b.date.localeCompare(a.date)).map(s=>`<details><summary>${e(s.date)} · ${e(course(groups.get(s.group)))} · ${e(s.start)}–${e(s.end)} · ${s.closed?'Realizada':'Planificada'}</summary><p>${e(s.term)}</p>${s.items.map(i=>`<p>${e(coreos.get(i.coreo)?.name)} · ${e(i.mode)} · ${i.done?'Realizada':i.planned?'Planeada':'Pendiente'}<br>${e(i.note)}</p>`).join('')}</details>`));
   }catch(error){if(target.isConnected)target.textContent=error.message;}
 }
@@ -335,7 +335,7 @@ function cloudSuggestionDetails(c){
   const e=cloudEscape;
   return `<p>${e(c.author)} · ${e(c.level)} · ${e(c.counts)} counts · ${e(c.walls)} paredes</p>`+
     ['music','video','sheet'].map(key=>{try{const url=new URL(c[key]);return ['https:','http:'].includes(url.protocol)?`<p><a href="${e(url.href)}" target="_blank" rel="noopener noreferrer">${{music:'Música',video:'Vídeo',sheet:'Hoja'}[key]}</a></p>`:'';}catch{return '';}}).join('')+
-    (c.extras?`<p class="suggestion-extras">${e(c.extras)}</p>`:'');
+    (c.extras?`<div class="suggestion-extras extras-rich">${extrasHtml(c.extras)}</div>`:'');
 }
 async function cloudSuggestions(initialState='pending'){
   const admin=cloudUser.role==='admin',e=cloudEscape;
@@ -384,7 +384,7 @@ async function cloudReviewSuggestion(suggestion,decision){
   let knownLevels=[];
   if(accepted){try{knownLevels=commonCoreoLevels((await cloudApi('library')).coreos);}catch(error){toast(error.message);return;}}
   const input=(key,label,type='text',required=false)=>`<div><label for="review-${key}">${label}</label><input id="review-${key}" name="${key}" type="${type}" value="${e(c[key]??'')}" ${required?'required':''} ${type==='number'?'min="1" max="999"':''}></div>`;
-  const editor=accepted?`<div class="review-editor">${input('name','Nombre de la coreografía','text',true)}${input('author','Autor')}<div class="form-grid"><div>${levelEditorMarkup(c.level,knownLevels,'review')}</div>${input('walls','Paredes','number')}${input('counts','Counts','number')}</div>${input('music','Enlace a música','url')}${input('video','Enlace a vídeo','url')}${input('sheet','Enlace a la hoja','url')}<label for="review-extras">Extras</label><textarea id="review-extras" name="extras" rows="4">${e(c.extras||'')}</textarea></div>`:`<h3>${e(c.name)}</h3><p class="sub">Explica qué necesita corregir el profesor. Verá el motivo en sus propuestas.</p>`;
+  const editor=accepted?`<div class="review-editor">${input('name','Nombre de la coreografía','text',true)}${input('author','Autor')}<div class="form-grid"><div>${levelEditorMarkup(c.level,knownLevels,'review')}</div>${input('walls','Paredes','number')}${input('counts','Counts','number')}</div>${input('music','Enlace a música','url')}${input('video','Enlace a vídeo','url')}${input('sheet','Enlace a la hoja','url')}${extrasEditorMarkup(c.extras||'')}</div>`:`<h3>${e(c.name)}</h3><p class="sub">Explica qué necesita corregir el profesor. Verá el motivo en sus propuestas.</p>`;
   cloudDialog(accepted?'Revisar y aceptar':'Descartar propuesta',`<p class="sub">Propuesta por <strong>${e(suggestion.teacher_name)}</strong> · ${e(suggestion.teacher_email)}</p>${accepted?'<p class="sub">Puedes corregir la ficha del catálogo. Al aceptar se guardará sin publicar; después podrás compartirla desde la gestión del catálogo común. La ficha privada del profesor se conserva.</p>':''}${editor}<label for="review-note">${accepted?'Comentario para el profesor (opcional)':'Motivo del descarte'}</label><textarea id="review-note" name="review_note" maxlength="2000" rows="3" ${accepted?'':'required'}></textarea>`,async values=>{
     const body={id:suggestion.id,decision,review_note:values.review_note};
     if(accepted){const level=resolveCoreoLevel(values,knownLevels);const {review_note,new_level,...coreo}=values;coreo.level=level;coreo.id=c.id;for(const key of ['walls','counts'])if(coreo[key])coreo[key]=Number(coreo[key]);body.coreo=coreo;}
@@ -393,7 +393,7 @@ async function cloudReviewSuggestion(suggestion,decision){
     await cloudRefreshCoreoStates();await cloudRefreshNotifications();
     await cloudSuggestions(accepted?'accepted':'rejected');toast(accepted?'Aceptada en el catálogo común, sin publicar. Publícala desde la gestión del catálogo cuando quieras compartirla.':'Propuesta descartada; el profesor verá el motivo');
   },accepted?'Confirmar aceptación':'Confirmar descarte');
-  if(accepted)mountLevelEditor('review');
+  if(accepted){mountLevelEditor('review');mountExtrasEditor();}
 }
 let cloudCoreoStates=null,cloudCoreoStatesBusy=false,cloudCoreoOrigins={};
 function cloudProvenanceMarkup(c){

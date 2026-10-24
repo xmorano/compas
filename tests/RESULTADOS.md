@@ -65,3 +65,6 @@ Chrome real (`tests/custom_levels_test.cjs`): crear, guardar y recuperar un nive
 
 
 Actualización 2026-10-24: aceptar una propuesta la guarda en el catálogo común como «Aceptada · sin publicar». Solo «Publicar» la ofrece a los profesores y genera avisos. Las tarjetas muestran quién la propuso y quién la publicó. El administrador puede copiar también los borradores a su lista privada; al copiar se limpian los filtros de coreografías. No requiere migración SQL. Subir también `api/index.php` y `api/lib.php`. Pruebas de navegador con API simulada superadas; integración PHP/MySQL pendiente (PHP no instalado en este entorno).
+
+
+2026-10-24: extras enriquecidos en propuestas compartidas, historial y consulta de recursos del profesor. La revisión usa el editor con formato. Prueba de navegador con API simulada: HTML permitido, eliminación de etiquetas peligrosas, texto plano escapado y conservación del formato al aceptar.
