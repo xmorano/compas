@@ -157,11 +157,30 @@ function createUser(string $email, string $name, string $password, string $role)
 function libraryData(bool $includeUnpublished=false, ?string $excludeOriginUser=null): array {
     $row=query('SELECT payload,version FROM compas_library WHERE id=1')->fetch();
     $coreos=json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR);
+    // Accepted snapshots remain recoverable if an older catalog write omitted them.
+    // Existing entries (including withdrawn ones) always win; recovery never republishes.
+    $known=array_fill_keys(array_column($coreos,'id'),true);
+    $accepted=query("SELECT s.id,s.user_id,s.payload,u.name,r.payload AS reviewed_payload FROM compas_suggestions s JOIN compas_users u ON u.id=s.user_id LEFT JOIN compas_suggestion_reviews r ON r.suggestion_id=s.id WHERE s.status='accepted' ORDER BY s.created_at,s.id")->fetchAll();
+    foreach ($accepted as $suggestion) {
+        $id='suggestion_'.$suggestion['id'];
+        if (isset($known[$id])) continue;
+        $snapshot=json_decode($suggestion['reviewed_payload'] ?: $suggestion['payload'],true,64,JSON_THROW_ON_ERROR);
+        if (!is_array($snapshot) || empty($snapshot['name'])) $snapshot=json_decode($suggestion['payload'],true,64,JSON_THROW_ON_ERROR);
+        $restored=sharedCoreo($snapshot);
+        $restored['id']=$id;
+        $restored['published']=false;
+        $restored['acceptedDraft']=true;
+        $restored['publicationVersion']=0;
+        $restored['originTeacherId']=$suggestion['user_id'];
+        $restored['originTeacherName']=$suggestion['name'];
+        $coreos[]=$restored;
+        $known[$id]=true;
+    }
     // Recover attribution for proposals accepted before provenance was stored in the catalog.
     $missing=array_filter($coreos,fn($c)=>str_starts_with($c['id'],'suggestion_') && (empty($c['originTeacherName']) || empty($c['originTeacherId'])));
     if ($missing) {
         $origins=[];
-        foreach (query("SELECT s.id,s.user_id,u.name FROM compas_suggestions s JOIN compas_users u ON u.id=s.user_id WHERE s.status='accepted'")->fetchAll() as $origin) $origins['suggestion_'.$origin['id']]=$origin;
+        foreach ($accepted as $origin) $origins['suggestion_'.$origin['id']]=$origin;
         foreach ($coreos as &$coreo) if (isset($origins[$coreo['id']]) && (empty($coreo['originTeacherName']) || empty($coreo['originTeacherId']))) {
             $coreo['originTeacherName']=$origins[$coreo['id']]['name'];
             $coreo['originTeacherId']=$origins[$coreo['id']]['user_id'];
