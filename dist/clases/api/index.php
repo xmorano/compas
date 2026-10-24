@@ -113,18 +113,22 @@ try {
         $library=array_fill_keys(array_column(libraryData()['coreos'],'id'),true);
         $suggestions=[];
         foreach (query('SELECT id,source_id,status FROM compas_suggestions WHERE user_id=?',[$u['id']])->fetchAll() as $s) $suggestions[$s['source_id']]=$s;
-        $states=[];
+        $states=[]; $origins=[];
+        $catalog=array_column(libraryData($u['role']==='admin')['coreos'],null,'id');
         foreach ($workspace['coreos'] as $c) {
             $suggestion=$suggestions[$c['id']] ?? null;
             if ($suggestion && $suggestion['status']==='pending') $state='pending';
             elseif ($suggestion && $suggestion['status']==='rejected') $state='rejected';
             elseif ($suggestion && $suggestion['status']==='accepted' && isset($library['suggestion_'.$suggestion['id']])) $state='accepted';
+            elseif ($suggestion && $suggestion['status']==='accepted') $state='approved';
             elseif (isset($library[$c['id']])) $state='shared';
             elseif (!empty($c['libraryId']) && isset($library[$c['libraryId']])) $state='imported';
             else $state='private';
             $states[$c['id']]=$state;
+            $entry=$catalog[$c['libraryId'] ?? $c['id']] ?? [];
+            $origins[$c['id']]=array_intersect_key($entry,array_flip(['originTeacherName','published','publishedById','publishedByName']));
         }
-        reply(['states'=>(object)$states]);
+        reply(['states'=>(object)$states,'origins'=>(object)$origins]);
     }
     if ($action==='suggestions' && $method==='GET') {
         $where=$u['role']==='admin' ? ' WHERE s.user_id<>?' : ' WHERE s.user_id=?';
@@ -173,7 +177,11 @@ try {
             foreach ($library['coreos'] as $existing) if (($existing['published'] ?? true)!==false && (preg_replace('/\s+/u',' ',trim($existing['name'])) === preg_replace('/\s+/u',' ',trim($coreo['name'])) || strcasecmp(trim($existing['name']),trim($coreo['name']))===0)) { $pdo->rollBack(); fail('Ya existe una coreografía con ese nombre en el catálogo común. Puedes descartar la propuesta.',409); }
             $coreo['id']='suggestion_'.$id;
             $coreo['publicationVersion']=$library['version']+1;
-            $coreo['published']=true;
+            $coreo['published']=false;
+            $coreo['acceptedDraft']=true;
+            $origin=query('SELECT u.id,u.name FROM compas_suggestions s JOIN compas_users u ON u.id=s.user_id WHERE s.id=?',[$id])->fetch();
+            $coreo['originTeacherName']=$origin['name'];
+            $coreo['originTeacherId']=$origin['id'];
             $library['coreos'][]=$coreo;
             validateWorkspace(['centers'=>[],'groups'=>[],'sessions'=>[],'coreos'=>$library['coreos']]);
             $saved=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($library['coreos'],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$library['version']]);
@@ -192,7 +200,11 @@ try {
         if ($library['version']!==$body['version']) fail('El catálogo común ha cambiado. Ciérralo y vuelve a abrirlo.',409);
         $merged=[];
         foreach ($library['coreos'] as $coreo) $merged[$coreo['id']]=$coreo;
-        foreach ($data['coreos'] as $coreo) $merged[$coreo['id']]=sharedCoreo($coreo)+['publicationVersion'=>$library['version']+1,'published'=>true];
+        foreach ($data['coreos'] as $coreo) {
+            $previous=$merged[$coreo['id']] ?? [];
+            $origin=array_intersect_key($previous,array_flip(['originTeacherName','originTeacherId']));
+            $merged[$coreo['id']]=sharedCoreo($coreo)+$origin+['publicationVersion'=>$library['version']+1,'published'=>true,'acceptedDraft'=>false,'publishedById'=>$u['id'],'publishedByName'=>$u['name']];
+        }
         $coreos=array_values($merged);
         validateWorkspace(['centers'=>[], 'groups'=>[], 'sessions'=>[], 'coreos'=>$coreos]);
         $changed=query('UPDATE compas_library SET payload=?,version=version+1,updated_at=? WHERE id=1 AND version=?',[json_encode($coreos,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$body['version']]);

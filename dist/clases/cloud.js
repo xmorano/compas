@@ -183,13 +183,13 @@ function libraryCopies(catalog, selectedIds, own) {
     sources.add(c.id);names.add(normalize(c.name));return true;
   }).map(c=>({...c,id:crypto.randomUUID(),libraryId:c.id}));
 }
-async function cloudLibrary(onlyNew=false){
+async function cloudLibrary(onlyNew=false,initialIds=[]){
   cloudDialog('Catálogo común',`<p class="sub">Copia coreografías a tu lista privada. Si ignoras una novedad, no volverá a avisarte hasta que se comparta de nuevo. Siempre podrás encontrarla desactivando el filtro de novedades.</p><label class="share-option"><input id="library-new" type="checkbox" ${onlyNew?'checked':''}><span>Solo coreografías nuevas</span></label><button type="button" class="text-button" id="library-seen">Marcar novedades como vistas</button><label for="library-search">Buscar por nombre</label><input id="library-search" type="search"><div class="card-actions"><button type="button" class="button secondary" id="library-all">Marcar todas</button><button type="button" class="button secondary" id="library-none">Desmarcar todas</button><button type="button" class="button secondary" id="library-ignore-all" disabled>Ignorar novedades visibles</button></div><div id="library-list" class="share-list">Cargando…</div><p id="library-count" class="sub" role="status"></p><div id="library-level-proposals"></div>`,async()=>{
     const copies=resolveLevelTransfer(libraryCopies(catalog,[...selected],db.coreos),cloudEl('library-level-proposals'),userCoreoLevels());
     if(!copies.length)throw new Error('Selecciona alguna coreografía que no esté en tu lista.');
     const previous=db.coreos,previousLevels=db.customLevels;db.coreos=[...previous,...copies];
     try{rememberCoreoLevels(copies.map(c=>c.level));save();}catch(error){db.coreos=previous;if(previousLevels===undefined)delete db.customLevels;else db.customLevels=previousLevels;throw error;}
-    document.getElementById('modal').close();render();toast(copies.length+' coreografías copiadas a tu lista');
+    document.getElementById('modal').close();cloudShowOwnCoreos();toast(copies.length+' coreografías copiadas a tu lista privada');
     try{await acknowledge('library-seen',copies.map(c=>c.libraryId));}catch(error){toast('Copias preparadas. No se pudo actualizar el aviso: '+error.message);}
   },'Copiar a mi lista');
   const target=cloudEl('library-list'),submit=document.querySelector('#form button[type="submit"]');submit.disabled=true;
@@ -223,7 +223,7 @@ async function cloudLibrary(onlyNew=false){
   cloudEl('library-ignore-all').onclick=()=>dismiss('library-ignore',visible().filter(c=>unseen.has(c.id)).map(c=>c.id));
   cloudEl('library-all').onclick=()=>{libraryCopies(visible(),visible().map(c=>c.id),db.coreos).forEach(c=>selected.add(c.libraryId));update();};
   cloudEl('library-none').onclick=()=>{selected.clear();update();};
-  try{const result=await cloudApi('library');if(!target.isConnected)return;unseen=new Set(result.unseenIds);catalog=result.coreos.filter(c=>c.published!==false).sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base',numeric:true}));update();}catch(error){if(target.isConnected)target.textContent=error.message;}
+  try{const result=await cloudApi('library');if(!target.isConnected)return;unseen=new Set(result.unseenIds);catalog=result.coreos.filter(c=>c.published!==false||(cloudUser.role==='admin'&&initialIds.includes(c.id))).sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base',numeric:true}));if(initialIds.length){const copies=libraryCopies(catalog,initialIds,db.coreos);copies.forEach(c=>selected.add(c.libraryId));if(!copies.length&&catalog.some(c=>initialIds.includes(c.id))){document.getElementById('modal').close();cloudShowOwnCoreos();toast('La coreografía ya está en tu lista, o tienes otra con el mismo nombre.');return;}if(!copies.length)toast('Esta coreografía ya no está publicada en el catálogo común.');}update();}catch(error){if(target.isConnected)target.textContent=error.message;}
 }
 let cloudLibraryManager=null;
 function cloudPublishLibrary(){
@@ -231,7 +231,7 @@ function cloudPublishLibrary(){
   cloudLibraryManager=null;page='library-admin';activeSession=null;render();
 }
 function cloudManagerRows(catalog,own){
-  const rows=new Map(catalog.map(c=>[c.id,{id:c.id,coreo:c,source:null,published:c.published!==false,archived:c.published===false}]));
+  const rows=new Map(catalog.map(c=>[c.id,{id:c.id,coreo:c,source:null,published:c.published!==false,archived:c.published===false&&!c.acceptedDraft}]));
   for(const c of own){const id=c.libraryId||c.id;if(rows.has(id))rows.get(id).source=c;else rows.set(id,{id,coreo:c,source:c,published:false,archived:false});}
   return [...rows.values()].sort((a,b)=>a.coreo.name.localeCompare(b.coreo.name,'es',{sensitivity:'base',numeric:true}));
 }
@@ -248,7 +248,7 @@ function cloudRenderLibraryManager(){
     if(!root.isConnected)return;
     const e=cloudEscape,shown=visible(),published=state.rows.filter(r=>r.published).length;
     cloudEl('manager-summary').innerHTML=`<div><strong>${published}</strong><span>Publicadas</span></div><div><strong>${state.rows.length-published}</strong><span>Sin publicar</span></div><div><strong>${shown.length}</strong><span>En esta vista</span></div>`;
-    cloudEl('manager-cards').innerHTML=shown.map(row=>`<article class="card manager-card"><div class="manager-card-top"><span class="coreo-state ${row.published?'shared':'private'}">${row.published?'Publicada':row.archived?'Retirada':'Sin publicar'}</span><label class="manager-checkbox"><input type="checkbox" data-manager-select="${e(row.id)}" aria-label="Seleccionar ${e(row.coreo.name)}" ${state.selected.has(row.id)?'checked':''}><span>Seleccionar</span></label></div><h3>${e(row.coreo.name)}</h3><p>${e(row.coreo.author)||'Autor pendiente'}</p><span class="tag">${e(row.coreo.level)}</span><small>${e(row.coreo.counts||'—')} counts · ${e(row.coreo.walls||'—')} paredes</small><div class="card-actions"><button type="button" class="button ${row.published?'secondary':''}" data-manager-operation="${row.published?'unpublish':'publish'}" data-manager-id="${e(row.id)}">${row.published?'Despublicar':'Publicar'}</button></div></article>`).join('')||'<div class="empty">No hay coreografías con estos filtros. Añade coreos a tu lista privada para publicarlas aquí.</div>';
+    cloudEl('manager-cards').innerHTML=shown.map(row=>`<article class="card manager-card"><div class="manager-card-top"><span class="coreo-state ${row.published?'shared':'private'}">${row.published?'Publicada':row.archived?'Retirada':row.coreo.acceptedDraft?'Aceptada · sin publicar':'Sin publicar'}</span><label class="manager-checkbox"><input type="checkbox" data-manager-select="${e(row.id)}" aria-label="Seleccionar ${e(row.coreo.name)}" ${state.selected.has(row.id)?'checked':''}><span>Seleccionar</span></label></div><h3>${e(row.coreo.name)}</h3><p>${e(row.coreo.author)||'Autor pendiente'}</p><span class="tag">${e(row.coreo.level)}</span>${cloudProvenanceMarkup(row.coreo)}<small>${row.source?'También en tu lista privada':row.published?'Solo en el catálogo común':'Sin copia en tu lista privada'}</small><small>${e(row.coreo.counts||'—')} counts · ${e(row.coreo.walls||'—')} paredes</small><div class="card-actions"><button type="button" class="button ${row.published?'secondary':''}" data-manager-operation="${row.published?'unpublish':'publish'}" data-manager-id="${e(row.id)}">${row.published?'Despublicar':'Publicar'}</button>${!row.source?`<button type="button" class="text-button" data-manager-copy="${e(row.id)}">Copiar a mis coreos</button>`:''}</div></article>`).join('')||'<div class="empty">No hay coreografías con estos filtros. Añade coreos a tu lista privada para publicarlas aquí.</div>';
     const selected=state.rows.filter(r=>state.selected.has(r.id));
     cloudEl('manager-selected').textContent=state.selected.size+' seleccionadas';
     cloudEl('manager-publish').disabled=state.loading||!selected.some(r=>!r.published);
@@ -283,7 +283,7 @@ function cloudRenderLibraryManager(){
   cloudEl('manager-publish').onclick=()=>operate('publish',[...state.selected]);
   cloudEl('manager-unpublish').onclick=()=>operate('unpublish',[...state.selected]);
   cloudEl('manager-cards').onchange=event=>{const id=event.target.dataset.managerSelect;if(id){if(event.target.checked)state.selected.add(id);else state.selected.delete(id);draw();}};
-  cloudEl('manager-cards').onclick=event=>{const button=event.target.closest('[data-manager-operation]');if(button)operate(button.dataset.managerOperation,[button.dataset.managerId]);};
+  cloudEl('manager-cards').onclick=event=>{const copy=event.target.closest('[data-manager-copy]');if(copy){cloudLibrary(false,[copy.dataset.managerCopy]);return;}const button=event.target.closest('[data-manager-operation]');if(button)operate(button.dataset.managerOperation,[button.dataset.managerId]);};
   if(state.loading)load();else draw();
 }
 
@@ -337,11 +337,11 @@ function cloudSuggestionDetails(c){
     ['music','video','sheet'].map(key=>{try{const url=new URL(c[key]);return ['https:','http:'].includes(url.protocol)?`<p><a href="${e(url.href)}" target="_blank" rel="noopener noreferrer">${{music:'Música',video:'Vídeo',sheet:'Hoja'}[key]}</a></p>`:'';}catch{return '';}}).join('')+
     (c.extras?`<p class="suggestion-extras">${e(c.extras)}</p>`:'');
 }
-async function cloudSuggestions(){
+async function cloudSuggestions(initialState='pending'){
   const admin=cloudUser.role==='admin',e=cloudEscape;
   cloudDialog(admin?'Propuestas de profesores':'Proponer al catálogo común',
     `<p class="sub">${admin?'Consulta quién propone cada coreo. Puedes corregir su ficha antes de publicarla o explicar al profesor por qué la descartas.':'Envía una coreo privada al administrador y consulta aquí su estado y los comentarios de revisión.'}</p>`+
-    (admin?'<div class="review-filters"><label for="suggestion-filter">Estado</label><select id="suggestion-filter"><option value="pending">Pendientes</option><option value="accepted">Publicadas</option><option value="rejected">Descartadas</option><option value="all">Todas</option></select><label for="suggestion-query">Buscar coreo o profesor</label><input id="suggestion-query" type="search" placeholder="Nombre de la coreo o del profesor"></div>':`<label for="suggestion-source">Coreografía de mi lista</label><select id="suggestion-source" name="source_id" required><option value="">Selecciona una coreografía</option>${[...db.coreos].sort((a,b)=>a.name.localeCompare(b.name,'es')).map(c=>`<option value="${e(c.id)}">${e(c.name)}</option>`).join('')}</select><div id="suggestion-preview"></div>`)+
+    (admin?'<div class="review-filters"><label for="suggestion-filter">Estado</label><select id="suggestion-filter"><option value="pending">Pendientes</option><option value="accepted">Aceptadas</option><option value="rejected">Descartadas</option><option value="all">Todas</option></select><label for="suggestion-query">Buscar coreo o profesor</label><input id="suggestion-query" type="search" placeholder="Nombre de la coreo o del profesor"></div>':`<label for="suggestion-source">Coreografía de mi lista</label><select id="suggestion-source" name="source_id" required><option value="">Selecciona una coreografía</option>${[...db.coreos].sort((a,b)=>a.name.localeCompare(b.name,'es')).map(c=>`<option value="${e(c.id)}">${e(c.name)}</option>`).join('')}</select><div id="suggestion-preview"></div>`)+
     '<div id="suggestion-list" aria-live="polite">Cargando propuestas…</div>',async values=>{
       if(cloudFailure)throw new Error('Resuelve el error de guardado antes de enviar la propuesta.');
       if(cloudBusy)throw new Error('Espera a que termine el guardado antes de enviar la propuesta.');
@@ -353,6 +353,7 @@ async function cloudSuggestions(){
   const target=cloudEl('suggestion-list'),submit=document.querySelector('#form button[type="submit"]');
   submit.hidden=admin;
   let suggestions=[];
+  if(admin&&['pending','accepted','rejected','all'].includes(initialState))cloudEl('suggestion-filter').value=initialState;
   if(!admin){
     submit.disabled=true;
     cloudEl('suggestion-source').onchange=event=>{const coreo=db.coreos.find(c=>c.id===event.target.value);cloudEl('suggestion-preview').innerHTML=coreo?cloudSuggestionDetails(coreo):'';};
@@ -360,8 +361,8 @@ async function cloudSuggestions(){
   function draw(){
     const state=admin?cloudEl('suggestion-filter').value:'all',query=admin?cloudEl('suggestion-query').value.trim().toLocaleLowerCase('es'):'';
     const visible=suggestions.filter(s=>(state==='all'||s.status===state)&&(!query||[s.coreo.name,s.teacher_name,s.teacher_email].some(v=>String(v||'').toLocaleLowerCase('es').includes(query))));
-    const status={pending:'Propuesta pendiente',accepted:'Propuesta publicada',rejected:'Propuesta descartada'};
-    target.innerHTML=`<p class="sub review-count">${visible.length} propuestas${state==='pending'?' pendientes':''}</p>`+visible.map(s=>`<article class="suggestion-card"><div class="suggestion-heading"><h3>${e(s.coreo.name)}</h3><span class="coreo-state ${e(s.status)}">${e(status[s.status])}</span></div><p class="sub">${admin?`Propuesta por <strong>${e(s.teacher_name)}</strong> · ${e(s.teacher_email)}`:'Tu propuesta'}${s.created_at?' · '+e(new Date(Number(s.created_at)*1000).toLocaleDateString('es-ES')):''}</p>${cloudSuggestionDetails(s.coreo)}${s.review_note?`<div class="review-note"><strong>${s.status==='rejected'?'Motivo del descarte':'Comentario del administrador'}</strong><p>${e(s.review_note)}</p></div>`:''}${s.status==='accepted'&&s.reviewedCoreo?.name?`<details class="review-published"><summary>Ver ficha publicada</summary><h4>${e(s.reviewedCoreo.name)}</h4>${cloudSuggestionDetails(s.reviewedCoreo)}</details>`:''}${admin&&s.status==='pending'?`<div class="card-actions"><button type="button" class="button" data-review="accepted" data-suggestion="${e(s.id)}">Revisar y publicar</button><button type="button" class="button secondary" data-review="rejected" data-suggestion="${e(s.id)}">Descartar con motivo</button></div>`:''}</article>`).join('')+(visible.length?'':'<p class="empty">No hay propuestas.</p>');
+    const status={pending:'Propuesta pendiente',accepted:'Propuesta aceptada',rejected:'Propuesta descartada'};
+    target.innerHTML=`<p class="sub review-count">${visible.length} propuestas${state==='pending'?' pendientes':''}</p>`+visible.map(s=>`<article class="suggestion-card"><div class="suggestion-heading"><h3>${e(s.coreo.name)}</h3><span class="coreo-state ${e(s.status)}">${e(status[s.status])}</span></div><p class="sub">${admin?`Propuesta por <strong>${e(s.teacher_name)}</strong> · ${e(s.teacher_email)}`:'Tu propuesta'}${s.created_at?' · '+e(new Date(Number(s.created_at)*1000).toLocaleDateString('es-ES')):''}</p>${cloudSuggestionDetails(s.coreo)}${s.review_note?`<div class="review-note"><strong>${s.status==='rejected'?'Motivo del descarte':'Comentario del administrador'}</strong><p>${e(s.review_note)}</p></div>`:''}${s.status==='accepted'&&s.reviewedCoreo?.name?`<details class="review-published"><summary>Ver ficha aceptada</summary><h4>${e(s.reviewedCoreo.name)}</h4>${cloudSuggestionDetails(s.reviewedCoreo)}</details>`:''}${admin&&s.status==='accepted'?`<div class="card-actions"><button type="button" class="button secondary" data-copy-proposal="${e(s.id)}">Copiar a mis coreos</button></div>`:''}${admin&&s.status==='pending'?`<div class="card-actions"><button type="button" class="button" data-review="accepted" data-suggestion="${e(s.id)}">Revisar y aceptar</button><button type="button" class="button secondary" data-review="rejected" data-suggestion="${e(s.id)}">Descartar con motivo</button></div>`:''}</article>`).join('')+(visible.length?'':'<p class="empty">No hay propuestas.</p>');
   }
   async function load(){
     const result=await cloudApi('suggestions');if(!target.isConnected)return;
@@ -370,6 +371,7 @@ async function cloudSuggestions(){
   }
   if(admin){cloudEl('suggestion-filter').onchange=draw;cloudEl('suggestion-query').oninput=draw;}
   target.onclick=event=>{
+    const copy=event.target.closest('[data-copy-proposal]');if(copy){document.getElementById('modal').close();cloudLibrary(false,['suggestion_'+copy.dataset.copyProposal]);return;}
     const button=event.target.closest('[data-review]');if(!button)return;
     const suggestion=suggestions.find(s=>s.id===button.dataset.suggestion);if(!suggestion)return;
     document.getElementById('modal').close();cloudReviewSuggestion(suggestion,button.dataset.review);
@@ -383,27 +385,32 @@ async function cloudReviewSuggestion(suggestion,decision){
   if(accepted){try{knownLevels=commonCoreoLevels((await cloudApi('library')).coreos);}catch(error){toast(error.message);return;}}
   const input=(key,label,type='text',required=false)=>`<div><label for="review-${key}">${label}</label><input id="review-${key}" name="${key}" type="${type}" value="${e(c[key]??'')}" ${required?'required':''} ${type==='number'?'min="1" max="999"':''}></div>`;
   const editor=accepted?`<div class="review-editor">${input('name','Nombre de la coreografía','text',true)}${input('author','Autor')}<div class="form-grid"><div>${levelEditorMarkup(c.level,knownLevels,'review')}</div>${input('walls','Paredes','number')}${input('counts','Counts','number')}</div>${input('music','Enlace a música','url')}${input('video','Enlace a vídeo','url')}${input('sheet','Enlace a la hoja','url')}<label for="review-extras">Extras</label><textarea id="review-extras" name="extras" rows="4">${e(c.extras||'')}</textarea></div>`:`<h3>${e(c.name)}</h3><p class="sub">Explica qué necesita corregir el profesor. Verá el motivo en sus propuestas.</p>`;
-  cloudDialog(accepted?'Revisar y publicar':'Descartar propuesta',`<p class="sub">Propuesta por <strong>${e(suggestion.teacher_name)}</strong> · ${e(suggestion.teacher_email)}</p>${accepted?'<p class="sub">Puedes corregir la ficha pública. La coreografía privada del profesor se conserva.</p>':''}${editor}<label for="review-note">${accepted?'Comentario para el profesor (opcional)':'Motivo del descarte'}</label><textarea id="review-note" name="review_note" maxlength="2000" rows="3" ${accepted?'':'required'}></textarea>`,async values=>{
+  cloudDialog(accepted?'Revisar y aceptar':'Descartar propuesta',`<p class="sub">Propuesta por <strong>${e(suggestion.teacher_name)}</strong> · ${e(suggestion.teacher_email)}</p>${accepted?'<p class="sub">Puedes corregir la ficha del catálogo. Al aceptar se guardará sin publicar; después podrás compartirla desde la gestión del catálogo común. La ficha privada del profesor se conserva.</p>':''}${editor}<label for="review-note">${accepted?'Comentario para el profesor (opcional)':'Motivo del descarte'}</label><textarea id="review-note" name="review_note" maxlength="2000" rows="3" ${accepted?'':'required'}></textarea>`,async values=>{
     const body={id:suggestion.id,decision,review_note:values.review_note};
     if(accepted){const level=resolveCoreoLevel(values,knownLevels);const {review_note,new_level,...coreo}=values;coreo.level=level;coreo.id=c.id;for(const key of ['walls','counts'])if(coreo[key])coreo[key]=Number(coreo[key]);body.coreo=coreo;}
     await cloudApi('review-suggestion',body);
     document.getElementById('modal').close();
     await cloudRefreshCoreoStates();await cloudRefreshNotifications();
-    await cloudSuggestions();toast(accepted?'Coreografía publicada con la ficha revisada':'Propuesta descartada; el profesor verá el motivo');
-  },accepted?'Confirmar publicación':'Confirmar descarte');
+    await cloudSuggestions(accepted?'accepted':'rejected');toast(accepted?'Aceptada en el catálogo común, sin publicar. Publícala desde la gestión del catálogo cuando quieras compartirla.':'Propuesta descartada; el profesor verá el motivo');
+  },accepted?'Confirmar aceptación':'Confirmar descarte');
   if(accepted)mountLevelEditor('review');
 }
-let cloudCoreoStates=null,cloudCoreoStatesBusy=false;
-const cloudStateLabels={private:'Privada',shared:'Compartida',imported:'Copiada del catálogo',pending:'Propuesta pendiente',accepted:'Propuesta publicada',rejected:'Propuesta descartada'};
+let cloudCoreoStates=null,cloudCoreoStatesBusy=false,cloudCoreoOrigins={};
+function cloudProvenanceMarkup(c){
+ const origin=cloudCoreoOrigins[c.id]||c;
+ return `<small data-coreo-provenance="${cloudEscape(c.id)}">${origin.originTeacherName?'Propuesta por '+cloudEscape(origin.originTeacherName)+' · ':''}${origin.published===true?(origin.publishedById===cloudUser.id?'Publicada por ti':origin.publishedByName?'Publicada por '+cloudEscape(origin.publishedByName):'Publicada en el catálogo'):origin.published===false?'Sin compartir':''}</small>`;
+}
+const cloudStateLabels={approved:'Aceptada · sin publicar',private:'Privada',shared:'Compartida',imported:'Copiada del catálogo',pending:'Propuesta pendiente',accepted:'Propuesta aceptada',rejected:'Propuesta descartada'};
 function cloudCoreoStateMarkup(c){
   const state=cloudCoreoStates?.[c.id]||(!cloudCoreoStates?'loading':'private');
-  return `<span class="coreo-state ${state}" data-coreo-state="${cloudEscape(c.id)}">${cloudStateLabels[state]||'Consultando estado…'}</span>`;
+  return `<span class="coreo-state ${state}" data-coreo-state="${cloudEscape(c.id)}">${cloudStateLabels[state]||'Consultando estado…'}</span>${cloudProvenanceMarkup(c)}`;
 }
 async function cloudRefreshCoreoStates(){
   if(cloudCoreoStatesBusy)return;
   cloudCoreoStatesBusy=true;
   try{
-    const result=await cloudApi('coreo-states');cloudCoreoStates=result.states;
+    const result=await cloudApi('coreo-states');cloudCoreoStates=result.states;cloudCoreoOrigins=result.origins||{};
+    document.querySelectorAll('[data-coreo-provenance]').forEach(el=>{el.outerHTML=cloudProvenanceMarkup({id:el.dataset.coreoProvenance});});
     document.querySelectorAll('[data-coreo-state]').forEach(el=>{const state=cloudCoreoStates[el.dataset.coreoState]||'private';el.className='coreo-state '+state;el.textContent=cloudStateLabels[state]||'Privada';});
   }catch{
     document.querySelectorAll('[data-coreo-state]').forEach(el=>{el.className='coreo-state loading';el.textContent='Estado no disponible';});
@@ -443,4 +450,9 @@ async function cloudShareCoreo(id){
       await cloudRefreshNotifications();
     },admin?'Confirmar publicación':'Confirmar sugerencia');
   if(admin)renderLevelTransfer(cloudEl('share-level-proposals'),[source],commonCoreoLevels(sharedLibrary.coreos),'el catálogo común');
+}
+
+function cloudShowOwnCoreos(){
+  if(typeof catalogFilters!=='undefined'){catalogFilters.query='';for(const key of ['level','walls','counts'])catalogFilters[key]=[];}
+  go('coreos');
 }
