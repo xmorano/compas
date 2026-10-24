@@ -401,3 +401,6 @@ Actualización 2026-10-24: aceptar una propuesta la guarda en el catálogo comú
 
 
 2026-10-24: el botón «Catálogo común» de Coreografías abre para el administrador la gestión completa, con las propuestas aceptadas sin publicar. La aceptación lleva directamente a esa pantalla. Para usarlas en clases, la acción «Copiar a mis coreos» crea la copia privada. Actualizar `cloud.js`, `index.html` y `sw.js` desde `dist/clases/`.
+
+
+2026-10-24: las publicaciones no se ofrecen al profesor que propuso la coreografía ni generan avisos para él; los demás profesores siguen recibiéndolas. Se conserva la procedencia también en propuestas antiguas con identificador de sugerencia. Las tarjetas y el selector del catálogo muestran «Compartida por»; actualizar los estados ya no borra la procedencia del catálogo administrado. Subir `cloud.js`, `index.html`, `sw.js`, `api/index.php` y `api/lib.php` desde `dist/clases/`. Sin migración SQL. Pruebas de interfaz con API simulada superadas; integración PHP/MySQL pendiente porque no hay PHP instalado.

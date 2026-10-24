@@ -71,3 +71,6 @@ Actualización 2026-10-24: aceptar una propuesta la guarda en el catálogo comú
 
 
 2026-10-24: corregido el acceso «Catálogo común» para administradores: abre la gestión completa e incluye propuestas aceptadas sin publicar. Tras aceptar se abre esa gestión directamente. Pruebas de navegador con API simulada superadas: navegación tras aceptar, tarjeta de borrador visible con procedencia y acción Publicar, y conservación de la consulta de historial.
+
+
+2026-10-24: las publicaciones no se ofrecen al profesor que propuso la coreografía ni generan avisos para él; los demás profesores siguen recibiéndolas. Se conserva la procedencia también en propuestas antiguas con identificador de sugerencia. Las tarjetas y el selector del catálogo muestran «Compartida por»; actualizar los estados ya no borra la procedencia del catálogo administrado. Subir `cloud.js`, `index.html`, `sw.js`, `api/index.php` y `api/lib.php` desde `dist/clases/`. Sin migración SQL. Pruebas de interfaz con API simulada superadas; integración PHP/MySQL pendiente porque no hay PHP instalado.

@@ -40,6 +40,13 @@ const assert=require('node:assert/strict');
    };
    cloudStartNotifications();
   });
+  await page.evaluate(async()=>{
+   const box=document.createElement('div');box.id='provenance-regression';
+   box.innerHTML=cloudProvenanceMarkup({id:'accepted-common',originTeacherName:'Ana',published:false});document.body.append(box);
+   await cloudRefreshCoreoStates();
+   if(!box.textContent.includes('Compartida por Ana'))throw Error('La actualización de estados borra el origen de las aceptadas');
+   box.remove();
+  });
   await page.waitForSelector('[data-new-coreos]');await page.click('[data-new-coreos]');
   await page.waitForSelector('#library-list input');
   assert.equal(await page.$eval('#library-new',e=>e.checked),true);

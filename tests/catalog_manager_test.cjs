@@ -45,7 +45,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  await p.evaluate(()=>{catalog.push({id:'accepted-draft',name:'Aceptada de Ana',level:'Inicial',published:false,acceptedDraft:true,originTeacherName:'Ana'});return cloudLibrary();});
  await p.waitForSelector('[data-manager-id="accepted-draft"]');
  assert((await p.$eval('#manager-cards',e=>e.textContent)).includes('Aceptada · sin publicar'));
- assert((await p.$eval('#manager-cards',e=>e.textContent)).includes('Propuesta por Ana'));
+ assert((await p.$eval('#manager-cards',e=>e.textContent)).includes('Compartida por Ana'));
  assert.equal(await p.$eval('[data-manager-id="accepted-draft"]',e=>e.textContent),'Publicar');
  assert.equal(await p.$eval('#modal',e=>e.open),false);
  await p.type('#manager-search','Privada');assert.equal(await p.$$eval('.manager-card',els=>els.length),1);

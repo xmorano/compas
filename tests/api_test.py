@@ -86,7 +86,9 @@ assert draft['published'] is False and draft['acceptedDraft'] is True
 assert draft['originTeacherName']=='Profe'
 assert admin.call('workspace')['data']==empty
 admin.call('library',{'version':catalog['version'],'coreos':[{**draft,'originTeacherName':'Falso'}]})
-published=next(c for c in teacher.call('library')['coreos'] if c['id']=='suggestion_'+suggestion)
+assert all(c['id']!='suggestion_'+suggestion for c in teacher.call('library')['coreos'])
+assert teacher.call('notifications')['newCoreos']==1
+published=next(c for c in admin.call('library')['coreos'] if c['id']=='suggestion_'+suggestion)
 assert published['originTeacherName']=='Profe'
 assert published['publishedById']==a['user']['id']
 assert published['name']=='Mi versión'
@@ -106,14 +108,15 @@ admin.call('review-suggestion',{'id':rejected,'decision':'rejected','review_note
 assert teacher.call('coreo-states')['states']['private2']=='rejected'
 assert next(s for s in teacher.call('suggestions')['suggestions'] if s['id']==rejected)['review_note']=='Falta la hoja de pasos'
 assert not any(c['name']=='No publicar' for c in teacher.call('library')['coreos'])
-assert next(c for c in teacher.call('library')['coreos'] if c['id']==published['id'])['name']=='Mi versión'
+assert next(c for c in admin.call('library')['coreos'] if c['id']==published['id'])['name']=='Mi versión'
 # An authenticated third account cannot see the first teacher's suggestions.
 third=Client();third.call('bootstrap')
 third_token=admin.call('invite',{'kind':'invite','name':'Otra profe','email':'third@example.test'})['token']
 third.call('claim',{'token':third_token,'name':'Otra profe','password':'Third-test-123456'})
 assert third.call('suggestions')['suggestions']==[]
+assert any(c['id']=='suggestion_'+suggestion and c['originTeacherName']=='Profe' for c in third.call('library')['coreos'])
 assert third.call('notifications')['newCoreos']==3
-assert teacher.call('notifications')['newCoreos']==2
+assert teacher.call('notifications')['newCoreos']==1
 # Ignoring affects only this account and publication; a stale dismissal cannot hide a re-share.
 old=teacher.call('library')
 old_version=next(c['publicationVersion'] for c in old['coreos'] if c['id']=='coreo2')
