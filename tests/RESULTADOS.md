@@ -57,3 +57,8 @@ Chrome real (`tests/students_test.cjs`): controles de asistencia ocultos antes d
 ## Fotos de centros (23 de octubre de 2026)
 
 Chrome real (`tests/center_photos_test.cjs`): alta con imagen subida, conversión a JPEG, vista previa, conservación tras recarga, sustitución por URL y por otro archivo, cancelar sin sobrescribir, quitar foto y diseño sin desbordamiento móvil. Regresión de fichas y fotos de alumnos superada. Pruebas API ampliadas para datos de imagen, URL, retirada y rechazo de SVG, esquemas inseguros, base64 inválido y exceso de tamaño; pendientes de ejecución por falta de PHP. Falta verificar el guardado PHP/MySQL en hosting tras subir `api/lib.php`.
+
+
+## Niveles personalizados (24 de octubre de 2026)
+
+Chrome real (`tests/custom_levels_test.cjs`): crear, guardar y recuperar un nivel tras recargar; evitar duplicados por acentos/mayúsculas; cancelación sin crear; conservación de extras y nivel al editar; selección del nuevo nivel en grupos; aislamiento entre espacios. Con API de intercambio simulada: propuesta de niveles al copiar, asociación a uno existente o creación, publicación con mapeo sin cambiar el original privado y revisión de un nivel propuesto. Regresiones de catálogo y revisión superadas. Pruebas API ampliadas para persistencia, aislamiento y límites de la lista opcional `customLevels`; pendientes por falta de PHP en el entorno. Falta verificar el guardado PHP/MySQL en hosting con `api/lib.php` actualizado.

@@ -382,3 +382,16 @@ Al crear o editar un centro, puedes poner la **URL de la foto** o usar **Subir u
 Se admiten JPG, PNG y WebP de hasta 8 MB. El navegador reduce la imagen a un máximo de 768 píxeles (y, si hace falta, menos) y la convierte a JPEG antes de guardarla, con un máximo de 300 KB codificados. Se guarda en el JSON privado del centro, se sincroniza con la cuenta y se incluye en las copias de seguridad. No necesita carpetas de subida ni permisos nuevos en el hosting. Las URL HTTP/HTTPS existentes siguen funcionando.
 
 Para actualizar, sube de `dist/clases/`: **`app.js`**, **`style.css`**, **`api/lib.php`**, `index.html` y `sw.js`; también están en `dist/compas-clases-actualizacion.zip`. No requiere SQL ni tocar la configuración privada. Actualiza la interfaz y `api/lib.php` juntas para que el servidor acepte la foto subida.
+
+
+## Niveles personalizados por profesor
+
+En **Nueva/Editar coreografía → Nivel** puedes elegir uno existente o **Crear otro nivel…**. Se pide el nombre y se incorpora a tu lista al guardar la ficha. Cancelar no crea el nivel. Se conservan los tres iniciales y se reconocen los niveles ya utilizados en fichas y grupos antiguos; no se cambian al abrir y guardar el editor. Los nombres se normalizan para evitar duplicados por mayúsculas, acentos o espacios. Se admiten hasta 500 niveles personalizados, de 1 a 120 caracteres. También aparecen como opciones al crear o editar grupos.
+
+La lista se guarda en `customLevels` dentro del JSON privado de cada cuenta y se incluye en las copias de seguridad. No se comparte automáticamente con otros profesores. Las copias antiguas sin este campo siguen funcionando.
+
+Al seleccionar coreos para copiar del catálogo común, si su nivel no existe en tu lista aparece una propuesta: **Añadir ese nivel** o **Usar uno existente**. La elección se aplica solo a tu copia y los niveles nuevos se guardan al confirmar la importación. No se modifica el original común. Puedes asociar cada nivel entrante a uno distinto.
+
+Al publicar una coreo privada, individualmente o por lotes desde la gestión del catálogo, también se proponen los niveles que todavía no se usan en el catálogo común. Puedes mantenerlos como nuevos o asociarlos a uno existente. La ficha privada conserva su nivel. Al aprobar una propuesta de profesor, el editor sugiere crear su nivel si aún no existe; el administrador puede aceptarlo, cambiar el nombre o elegir otro nivel. El profesor mantiene su ficha original. Los niveles del catálogo común se obtienen de sus fichas, incluidas las retiradas para poder republicarlas.
+
+Para actualizar, sube de `dist/clases/`: **`app.js`**, **`cloud.js`**, **`style.css`**, **`api/lib.php`**, `index.html` y `sw.js`; también se incluyen en **`dist/compas-clases-actualizacion.zip`**. No requiere SQL ni cambiar `api/index.php` o configuración privada. Es necesario actualizar `api/lib.php` para conservar la lista privada de niveles.

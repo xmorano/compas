@@ -41,6 +41,11 @@ function validateWorkspace(mixed $data): array {
         if (!isset($data[$key]) || !is_array($data[$key]) || !array_is_list($data[$key]) || count($data[$key]) > 20000) fail('Lista no válida: ' . $key);
         $out[$key] = $data[$key];
     }
+    if (array_key_exists('customLevels',$data)) {
+        if (!is_array($data['customLevels']) || !array_is_list($data['customLevels']) || count($data['customLevels'])>500) fail('Lista de niveles no válida.');
+        foreach ($data['customLevels'] as $level) if (!is_string($level) || !trim($level) || strlen($level)>480) fail('Nivel personalizado no válido.');
+        $outLevels=$data['customLevels'];
+    }
     $ids = [];
     $required = ['centers'=>['name','address'], 'groups'=>['center','level','day','start','end'], 'coreos'=>['name','level'], 'sessions'=>['group','date','start','end','term']];
     foreach ($out as $key => $rows) {
@@ -61,6 +66,7 @@ function validateWorkspace(mixed $data): array {
         }
     }
     foreach ($out['groups'] as $g) if (!isset($ids['centers'][$g['center']])) fail('Un grupo hace referencia a un centro inexistente.');
+    if (isset($outLevels)) $out['customLevels']=$outLevels;
     $students=[];
     if (array_key_exists('studentsEnabled',$data)) {
         if (!is_bool($data['studentsEnabled'])) fail('Opción de alumnos no válida.');

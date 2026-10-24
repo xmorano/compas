@@ -202,4 +202,13 @@ third.call('workspace',{'version':v,'data':photo_workspace})
 photo_workspace['centers'][0]['photo']=''
 v=third.call('workspace')['version'];third.call('workspace',{'version':v,'data':photo_workspace})
 assert third.call('workspace')['data']['centers'][0]['photo']==''
+# Custom levels are optional workspace data and isolated per teacher.
+level_workspace=third.call('workspace')['data'];level_workspace['customLevels']=['Improver','Básico 2']
+v=third.call('workspace')['version'];third.call('workspace',{'version':v,'data':level_workspace})
+assert third.call('workspace')['data']['customLevels']==['Improver','Básico 2']
+assert 'customLevels' not in admin.call('workspace')['data']
+v=third.call('workspace')['version']
+for invalid_levels in ['Improver',[None],[''],['X'*481],['Nivel']*501]:
+ third.call('workspace',{'version':v,'data':{**level_workspace,'customLevels':invalid_levels}},expected=400)
+assert third.call('workspace')['data']['customLevels']==['Improver','Básico 2']
 print('API: cuentas, invitaciones de un uso, permisos, aislamiento, catálogo común, copias privadas, conflictos, validación, CSRF, recuperación y cierre correctos.')

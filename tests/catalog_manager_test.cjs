@@ -4,7 +4,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  const p=await browser.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));
  await p.setContent('<aside><nav><button id="cloud-admin">Administración</button></nav></aside><main><span id="crumb"></span><div id="content"></div></main><dialog id="modal"><form id="form"><h2 id="modal-title"></h2><button id="close" type="button">Cerrar</button><div id="fields"></div><button id="cancel" type="button">Cancelar</button><button type="submit">Guardar</button></form></dialog>');
  await p.addStyleTag({content:fs.readFileSync('style.css','utf8').split('\n').slice(1).join('\n')+fs.readFileSync('server/cloud.css','utf8')});
- let code=fs.readFileSync('server/cloud.js','utf8');code=code.slice(0,code.indexOf('(async()=>{try{'))+code.slice(code.indexOf('function libraryCopies'));await p.addScriptTag({content:code});
+ let code=fs.readFileSync('server/cloud.js','utf8');code=code.slice(0,code.indexOf('(async()=>{try{'))+code.slice(code.indexOf('function libraryCopies'));await p.addScriptTag({content:code});await p.addScriptTag({content:fs.readFileSync('custom-levels.js','utf8')});await p.evaluate(()=>window.esc=cloudEscape);
  await p.evaluate(()=>{
   cloudUser={id:'admin',role:'admin'};window.page='agenda';window.activeSession=null;
   window.db={coreos:[{id:'private',name:'Privada',level:'Inicial'},{id:'live',name:'Publicada',level:'Intermedio'}]};

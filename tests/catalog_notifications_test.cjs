@@ -10,6 +10,8 @@ const assert=require('node:assert/strict');
   let source=fs.readFileSync('server/cloud.js','utf8');
   source=source.slice(0,source.indexOf('(async()=>{try{'))+source.slice(source.indexOf('function libraryCopies'));
   await page.addScriptTag({content:source});
+  await page.addScriptTag({content:fs.readFileSync('custom-levels.js','utf8')});
+  await page.evaluate(()=>window.esc=cloudEscape);
   await page.addStyleTag({content:fs.readFileSync('server/cloud.css','utf8')});
   await page.evaluate(()=>{
    if(!crypto.randomUUID)crypto.randomUUID=()=> 'test-copy-'+Math.random().toString(16).slice(2);
