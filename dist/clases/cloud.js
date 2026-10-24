@@ -184,6 +184,7 @@ function libraryCopies(catalog, selectedIds, own) {
   }).map(c=>({...c,id:crypto.randomUUID(),libraryId:c.id}));
 }
 async function cloudLibrary(onlyNew=false,initialIds=[]){
+  if(cloudUser.role==='admin'&&!initialIds.length){cloudPublishLibrary();return;}
   cloudDialog('Catálogo común',`<p class="sub">Copia coreografías a tu lista privada. Si ignoras una novedad, no volverá a avisarte hasta que se comparta de nuevo. Siempre podrás encontrarla desactivando el filtro de novedades.</p><label class="share-option"><input id="library-new" type="checkbox" ${onlyNew?'checked':''}><span>Solo coreografías nuevas</span></label><button type="button" class="text-button" id="library-seen">Marcar novedades como vistas</button><label for="library-search">Buscar por nombre</label><input id="library-search" type="search"><div class="card-actions"><button type="button" class="button secondary" id="library-all">Marcar todas</button><button type="button" class="button secondary" id="library-none">Desmarcar todas</button><button type="button" class="button secondary" id="library-ignore-all" disabled>Ignorar novedades visibles</button></div><div id="library-list" class="share-list">Cargando…</div><p id="library-count" class="sub" role="status"></p><div id="library-level-proposals"></div>`,async()=>{
     const copies=resolveLevelTransfer(libraryCopies(catalog,[...selected],db.coreos),cloudEl('library-level-proposals'),userCoreoLevels());
     if(!copies.length)throw new Error('Selecciona alguna coreografía que no esté en tu lista.');
@@ -391,7 +392,7 @@ async function cloudReviewSuggestion(suggestion,decision){
     await cloudApi('review-suggestion',body);
     document.getElementById('modal').close();
     await cloudRefreshCoreoStates();await cloudRefreshNotifications();
-    await cloudSuggestions(accepted?'accepted':'rejected');toast(accepted?'Aceptada en el catálogo común, sin publicar. Publícala desde la gestión del catálogo cuando quieras compartirla.':'Propuesta descartada; el profesor verá el motivo');
+    if(accepted)cloudPublishLibrary();else await cloudSuggestions('rejected');toast(accepted?'Coreografía aceptada. Ya aparece aquí, sin publicar.':'Propuesta descartada; el profesor verá el motivo');
   },accepted?'Confirmar aceptación':'Confirmar descarte');
   if(accepted){mountLevelEditor('review');mountExtrasEditor();}
 }
