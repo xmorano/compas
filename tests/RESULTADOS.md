@@ -68,3 +68,6 @@ Actualización 2026-10-24: aceptar una propuesta la guarda en el catálogo comú
 
 
 2026-10-24: extras enriquecidos en propuestas compartidas, historial y consulta de recursos del profesor. La revisión usa el editor con formato. Prueba de navegador con API simulada: HTML permitido, eliminación de etiquetas peligrosas, texto plano escapado y conservación del formato al aceptar.
+
+
+2026-10-24: corregido el acceso «Catálogo común» para administradores: abre la gestión completa e incluye propuestas aceptadas sin publicar. Tras aceptar se abre esa gestión directamente. Pruebas de navegador con API simulada superadas: navegación tras aceptar, tarjeta de borrador visible con procedencia y acción Publicar, y conservación de la consulta de historial.

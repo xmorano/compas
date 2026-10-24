@@ -16,7 +16,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
    if(action==='library-unpublish'){if(body.version!==version)throw Error('Conflicto');for(const c of catalog)if(body.ids.includes(c.id))c.published=false;version++;return {version};}
    if(action==='library'&&body){if(body.version!==version)throw Error('Conflicto');for(const c of body.coreos){const old=catalog.findIndex(x=>x.id===c.id);const value={...c,published:true,publicationVersion:version+1};if(old>=0)catalog[old]=value;else catalog.push(value);}version++;return {version};}
    throw Error('Acción inesperada '+action);
-  };cloudPublishLibrary();
+  };cloudLibrary();
  });
  await p.evaluate(()=>{
   const draft={id:'draft-check',name:'Aceptada',published:false,acceptedDraft:true,originTeacherName:'Profe Ana'};
@@ -42,6 +42,12 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  await p.waitForFunction(()=>!document.getElementById('modal').open&&!cloudLibraryManager.loading);
  assert.equal(await p.evaluate(()=>catalog.filter(c=>c.published!==false).length),3);
  for(const width of [1280,390]){await p.setViewport({width,height:900});await p.select('#manager-filter','all');assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);}
+ await p.evaluate(()=>{catalog.push({id:'accepted-draft',name:'Aceptada de Ana',level:'Inicial',published:false,acceptedDraft:true,originTeacherName:'Ana'});return cloudLibrary();});
+ await p.waitForSelector('[data-manager-id="accepted-draft"]');
+ assert((await p.$eval('#manager-cards',e=>e.textContent)).includes('Aceptada · sin publicar'));
+ assert((await p.$eval('#manager-cards',e=>e.textContent)).includes('Propuesta por Ana'));
+ assert.equal(await p.$eval('[data-manager-id="accepted-draft"]',e=>e.textContent),'Publicar');
+ assert.equal(await p.$eval('#modal',e=>e.open),false);
  await p.type('#manager-search','Privada');assert.equal(await p.$$eval('.manager-card',els=>els.length),1);
  await p.evaluate(()=>{cloudUser.role='teacher';page='agenda';cloudPublishLibrary();});assert.equal(await p.evaluate(()=>page),'agenda');
  assert.deepEqual(errors,[]);console.log('OK: pantalla, filtros, confirmación, retirada por lote, republicación de propuesta externa, publicación múltiple y adaptación móvil. API simulada.');
