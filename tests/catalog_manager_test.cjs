@@ -18,6 +18,13 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
    throw Error('Acción inesperada '+action);
   };cloudPublishLibrary();
  });
+ await p.evaluate(()=>{
+  const draft={id:'draft-check',name:'Aceptada',published:false,acceptedDraft:true,originTeacherName:'Profe Ana'};
+  const row=cloudManagerRows([draft],[])[0];
+  if(row.published||row.archived)throw Error('Una propuesta aceptada debe ser un borrador');
+  if(!cloudProvenanceMarkup(draft).includes('Profe Ana')||!cloudProvenanceMarkup(draft).includes('Sin compartir'))throw Error('Falta la procedencia del borrador');
+  if(!cloudProvenanceMarkup({...draft,published:true,publishedById:cloudUser.id}).includes('Publicada por ti'))throw Error('Falta la autoría de publicación');
+ });
  await p.waitForSelector('[data-manager-select]');assert.equal(await p.$$eval('.manager-card',els=>els.length),3);
  assert.equal(await p.$eval('#modal',e=>e.open),false);
  await p.select('#manager-filter','published');assert.equal(await p.$$eval('.manager-card',els=>els.length),2);

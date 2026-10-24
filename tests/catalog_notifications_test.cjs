@@ -16,7 +16,7 @@ const assert=require('node:assert/strict');
   await page.evaluate(()=>{
    if(!crypto.randomUUID)crypto.randomUUID=()=> 'test-copy-'+Math.random().toString(16).slice(2);
    window.db={coreos:[{id:'private',name:'Mi coreo',level:'Inicial',music:'https://example.test/song',extras:'<img src=x onerror=alert(1)>'}]};
-   window.matchingRoutines=(rows,q)=>rows.filter(c=>c.name.includes(q));window.save=()=>{};window.render=()=>{};window.toast=message=>window.lastToast=message;
+   window.matchingRoutines=(rows,q)=>rows.filter(c=>c.name.includes(q));window.go=()=>{};window.save=()=>{};window.render=()=>{};window.toast=message=>window.lastToast=message;
    window.modal=(title,html)=>{document.getElementById('modal-title').textContent=title;document.getElementById('fields').innerHTML=html;document.querySelector('[type=submit]').disabled=false;document.getElementById('modal').showModal();};
    window.calls=[];window.proposals=[];window.seen={};window.noticeRevision=1;
    cloudUser={id:'teacher',role:'teacher'};
@@ -65,7 +65,7 @@ const assert=require('node:assert/strict');
   await page.click('[data-review=accepted]');await page.waitForSelector('#review-name');
   await page.$eval('#review-name',e=>e.value='Ficha pública corregida');
   await page.type('#review-note','Autor y ficha revisados');
-  await page.click('#form [type=submit]');await page.waitForFunction(()=>document.getElementById('suggestion-list').textContent.includes('No hay propuestas'));
+  await page.click('#form [type=submit]');await page.waitForFunction(()=>document.querySelector('[data-copy-proposal]'));
   assert.equal(await page.evaluate(()=>proposals[0].status),'accepted');
   assert.equal(await page.$('[data-pending-suggestions]'),null);
   assert.equal(await page.evaluate(()=>proposals[0].reviewedCoreo.name),'Ficha pública corregida');

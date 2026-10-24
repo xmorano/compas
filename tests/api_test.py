@@ -77,7 +77,18 @@ admin.call('review-suggestion',{'id':suggestion,'decision':'accepted','coreo':{*
 admin.call('review-suggestion',{'id':suggestion,'decision':'accepted'},expected=409)
 assert admin.call('notifications')['pendingSuggestions']==0
 assert teacher.call('suggestions')['suggestions'][0]['status']=='accepted'
+assert all(c['id']!='suggestion_'+suggestion for c in teacher.call('library')['coreos'])
+assert teacher.call('coreo-states')['states']['private1']=='approved'
+assert teacher.call('notifications')['newCoreos']==1
+catalog=admin.call('library')
+draft=next(c for c in catalog['coreos'] if c['id']=='suggestion_'+suggestion)
+assert draft['published'] is False and draft['acceptedDraft'] is True
+assert draft['originTeacherName']=='Profe'
+assert admin.call('workspace')['data']==empty
+admin.call('library',{'version':catalog['version'],'coreos':[{**draft,'originTeacherName':'Falso'}]})
 published=next(c for c in teacher.call('library')['coreos'] if c['id']=='suggestion_'+suggestion)
+assert published['originTeacherName']=='Profe'
+assert published['publishedById']==a['user']['id']
 assert published['name']=='Mi versión'
 assert published['author']=='Autor corregido'
 assert teacher.call('coreo-states')['states']['private1']=='accepted'
