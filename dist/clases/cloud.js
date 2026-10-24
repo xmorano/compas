@@ -184,11 +184,11 @@ function libraryCopies(catalog, selectedIds, own) {
   }).map(c=>({...c,id:crypto.randomUUID(),libraryId:c.id}));
 }
 async function cloudLibrary(onlyNew=false){
-  cloudDialog('Catálogo común',`<p class="sub">Copia coreografías a tu lista privada. Si ignoras una novedad, no volverá a avisarte hasta que se comparta de nuevo. Siempre podrás encontrarla desactivando el filtro de novedades.</p><label class="share-option"><input id="library-new" type="checkbox" ${onlyNew?'checked':''}><span>Solo coreografías nuevas</span></label><button type="button" class="text-button" id="library-seen">Marcar novedades como vistas</button><label for="library-search">Buscar por nombre</label><input id="library-search" type="search"><div class="card-actions"><button type="button" class="button secondary" id="library-all">Marcar todas</button><button type="button" class="button secondary" id="library-none">Desmarcar todas</button><button type="button" class="button secondary" id="library-ignore-all" disabled>Ignorar novedades visibles</button></div><div id="library-list" class="share-list">Cargando…</div><p id="library-count" class="sub" role="status"></p>`,async()=>{
-    const copies=libraryCopies(catalog,[...selected],db.coreos);
+  cloudDialog('Catálogo común',`<p class="sub">Copia coreografías a tu lista privada. Si ignoras una novedad, no volverá a avisarte hasta que se comparta de nuevo. Siempre podrás encontrarla desactivando el filtro de novedades.</p><label class="share-option"><input id="library-new" type="checkbox" ${onlyNew?'checked':''}><span>Solo coreografías nuevas</span></label><button type="button" class="text-button" id="library-seen">Marcar novedades como vistas</button><label for="library-search">Buscar por nombre</label><input id="library-search" type="search"><div class="card-actions"><button type="button" class="button secondary" id="library-all">Marcar todas</button><button type="button" class="button secondary" id="library-none">Desmarcar todas</button><button type="button" class="button secondary" id="library-ignore-all" disabled>Ignorar novedades visibles</button></div><div id="library-list" class="share-list">Cargando…</div><p id="library-count" class="sub" role="status"></p><div id="library-level-proposals"></div>`,async()=>{
+    const copies=resolveLevelTransfer(libraryCopies(catalog,[...selected],db.coreos),cloudEl('library-level-proposals'),userCoreoLevels());
     if(!copies.length)throw new Error('Selecciona alguna coreografía que no esté en tu lista.');
-    const previous=db.coreos;db.coreos=[...previous,...copies];
-    try{save();}catch(error){db.coreos=previous;throw error;}
+    const previous=db.coreos,previousLevels=db.customLevels;db.coreos=[...previous,...copies];
+    try{rememberCoreoLevels(copies.map(c=>c.level));save();}catch(error){db.coreos=previous;if(previousLevels===undefined)delete db.customLevels;else db.customLevels=previousLevels;throw error;}
     document.getElementById('modal').close();render();toast(copies.length+' coreografías copiadas a tu lista');
     try{await acknowledge('library-seen',copies.map(c=>c.libraryId));}catch(error){toast('Copias preparadas. No se pudo actualizar el aviso: '+error.message);}
   },'Copiar a mi lista');
@@ -202,6 +202,7 @@ async function cloudLibrary(onlyNew=false){
     cloudEl('library-count').textContent=selected.size+' seleccionadas';submit.disabled=!selected.size||ackBusy;
     cloudEl('library-ignore-all').disabled=ackBusy||!visible().some(c=>unseen.has(c.id));
     cloudEl('library-seen').disabled=ackBusy||!unseen.size;
+    renderLevelTransfer(cloudEl('library-level-proposals'),libraryCopies(catalog,[...selected],db.coreos),userCoreoLevels(),'tu lista privada');
   }
   async function acknowledge(action,ids){
     await cloudApi(action,{ids,versions:versions(ids)});
@@ -240,7 +241,7 @@ function cloudRenderLibraryManager(){
   cloudEl('crumb').textContent='Administración / Catálogo común';
   cloudEl('content').innerHTML=`<section id="library-manager"><div class="heading"><div><div class="eyebrow">ADMINISTRACIÓN</div><h1>Catálogo común</h1><p class="sub">Elige qué coreografías compartes con los profesores.</p></div><button type="button" class="button secondary" id="manager-reload">Actualizar</button></div><div id="manager-summary" class="manager-summary"></div><div class="toolbar manager-toolbar"><input type="search" id="manager-search" placeholder="Buscar coreografía o autor…" aria-label="Buscar coreografía o autor"><label class="manager-filter">Mostrar<select id="manager-filter"><option value="all">Todas</option><option value="published">Publicadas</option><option value="unpublished">Sin publicar</option><option value="archived">Retiradas</option></select></label></div><div class="manager-bulk"><div class="card-actions"><button type="button" class="text-button" id="manager-all">Marcar visibles</button><button type="button" class="text-button" id="manager-none">Desmarcar todas</button><span id="manager-selected" class="sub" role="status"></span></div><div class="card-actions"><button type="button" class="button" id="manager-publish" disabled>Publicar selección</button><button type="button" class="button secondary" id="manager-unpublish" disabled>Despublicar selección</button></div></div><p id="manager-error" class="csv-errors" role="alert" hidden></p><p class="sub manager-help">Despublicar impide nuevas importaciones. Las copias privadas de los profesores se conservan.</p><div class="cards manager-cards" id="manager-cards" aria-live="polite">Cargando catálogo…</div></section>`;
   const root=cloudEl('library-manager');
-  if(!cloudLibraryManager)cloudLibraryManager={rows:[],version:0,selected:new Set(),query:'',filter:'all',loading:true};
+  if(!cloudLibraryManager)cloudLibraryManager={rows:[],version:0,levels:[],selected:new Set(),query:'',filter:'all',loading:true};
   const state=cloudLibraryManager;
   function visible(){const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es');const q=normalize(state.query);return state.rows.filter(row=>(state.filter==='all'||state.filter==='published'&&row.published||state.filter==='unpublished'&&!row.published||state.filter==='archived'&&row.archived)&&(!q||normalize(row.coreo.name+' '+(row.coreo.author||'')).includes(q)));}
   function draw(){
@@ -257,7 +258,7 @@ function cloudRenderLibraryManager(){
   async function load(){
     state.loading=true;cloudEl('manager-reload').disabled=true;
     cloudEl('manager-publish').disabled=cloudEl('manager-unpublish').disabled=true;
-    try{const result=await cloudApi('library');state.version=result.version;state.rows=cloudManagerRows(result.coreos,db.coreos);state.selected.clear();state.loading=false;if(root.isConnected){cloudEl('manager-error').hidden=true;draw();}}
+    try{const result=await cloudApi('library');state.version=result.version;state.levels=commonCoreoLevels(result.coreos);state.rows=cloudManagerRows(result.coreos,db.coreos);state.selected.clear();state.loading=false;if(root.isConnected){cloudEl('manager-error').hidden=true;draw();}}
     catch(error){if(root.isConnected){cloudEl('manager-error').hidden=false;cloudEl('manager-error').textContent=error.message;cloudEl('manager-cards').textContent='No se pudo cargar el catálogo. Pulsa Actualizar para reintentarlo.';}}
     finally{if(root.isConnected)cloudEl('manager-reload').disabled=false;}
   }
@@ -266,11 +267,12 @@ function cloudRenderLibraryManager(){
     const rows=state.rows.filter(r=>ids.includes(r.id)&&(operation==='publish'?!r.published:r.published));
     if(!rows.length)return;
     const publishing=operation==='publish',e=cloudEscape;
-    cloudDialog(publishing?'Publicar en el catálogo común':'Despublicar del catálogo común',`<p class="sub">${publishing?'Los profesores podrán ver e importar estas coreografías y recibirán un aviso.':'Estas coreografías dejarán de estar disponibles para nuevas importaciones. Las copias privadas y sus clases no se modifican.'}</p><div class="share-list">${rows.map(r=>`<div class="share-option">${e(r.coreo.name)}</div>`).join('')}</div><p class="sub">${rows.length} coreografías</p>`,async()=>{
-      if(publishing){const coreos=rows.map(r=>{const {libraryId,publicationVersion,published,...copy}=r.source||r.coreo;return {...copy,id:r.id};});await cloudApi('library',{version:state.version,coreos});}
+    cloudDialog(publishing?'Publicar en el catálogo común':'Despublicar del catálogo común',`<p class="sub">${publishing?'Los profesores podrán ver e importar estas coreografías y recibirán un aviso.':'Estas coreografías dejarán de estar disponibles para nuevas importaciones. Las copias privadas y sus clases no se modifican.'}</p><div class="share-list">${rows.map(r=>`<div class="share-option">${e(r.coreo.name)}</div>`).join('')}</div><p class="sub">${rows.length} coreografías</p><div id="manager-level-proposals"></div>`,async()=>{
+      if(publishing){const coreos=rows.map(r=>{const {libraryId,publicationVersion,published,...copy}=r.source||r.coreo;return {...copy,id:r.id};});await cloudApi('library',{version:state.version,coreos:resolveLevelTransfer(coreos,cloudEl('manager-level-proposals'),state.levels)});}
       else await cloudApi('library-unpublish',{version:state.version,ids:rows.map(r=>r.id)});
       document.getElementById('modal').close();await load();await cloudRefreshCoreoStates();await cloudRefreshNotifications();toast(publishing?'Coreografías publicadas':'Coreografías retiradas del catálogo común');
     },publishing?'Confirmar publicación':'Confirmar despublicación');
+    if(publishing)renderLevelTransfer(cloudEl('manager-level-proposals'),rows.map(r=>r.source||r.coreo),state.levels,'el catálogo común');
   }
   cloudEl('manager-search').value=state.query;cloudEl('manager-filter').value=state.filter;
   cloudEl('manager-search').oninput=event=>{state.query=event.target.value;draw();};
@@ -374,19 +376,22 @@ async function cloudSuggestions(){
   };
   try{await load();}catch(error){if(target.isConnected)target.textContent=error.message;}
 }
-function cloudReviewSuggestion(suggestion,decision){
+async function cloudReviewSuggestion(suggestion,decision){
   if(cloudUser.role!=='admin')return;
   const accepted=decision==='accepted',e=cloudEscape,c=suggestion.coreo;
+  let knownLevels=[];
+  if(accepted){try{knownLevels=commonCoreoLevels((await cloudApi('library')).coreos);}catch(error){toast(error.message);return;}}
   const input=(key,label,type='text',required=false)=>`<div><label for="review-${key}">${label}</label><input id="review-${key}" name="${key}" type="${type}" value="${e(c[key]??'')}" ${required?'required':''} ${type==='number'?'min="1" max="999"':''}></div>`;
-  const editor=accepted?`<div class="review-editor">${input('name','Nombre de la coreografía','text',true)}${input('author','Autor')}<div class="form-grid">${input('level','Nivel','text',true)}${input('walls','Paredes','number')}${input('counts','Counts','number')}</div>${input('music','Enlace a música','url')}${input('video','Enlace a vídeo','url')}${input('sheet','Enlace a la hoja','url')}<label for="review-extras">Extras</label><textarea id="review-extras" name="extras" rows="4">${e(c.extras||'')}</textarea></div>`:`<h3>${e(c.name)}</h3><p class="sub">Explica qué necesita corregir el profesor. Verá el motivo en sus propuestas.</p>`;
+  const editor=accepted?`<div class="review-editor">${input('name','Nombre de la coreografía','text',true)}${input('author','Autor')}<div class="form-grid"><div>${levelEditorMarkup(c.level,knownLevels,'review')}</div>${input('walls','Paredes','number')}${input('counts','Counts','number')}</div>${input('music','Enlace a música','url')}${input('video','Enlace a vídeo','url')}${input('sheet','Enlace a la hoja','url')}<label for="review-extras">Extras</label><textarea id="review-extras" name="extras" rows="4">${e(c.extras||'')}</textarea></div>`:`<h3>${e(c.name)}</h3><p class="sub">Explica qué necesita corregir el profesor. Verá el motivo en sus propuestas.</p>`;
   cloudDialog(accepted?'Revisar y publicar':'Descartar propuesta',`<p class="sub">Propuesta por <strong>${e(suggestion.teacher_name)}</strong> · ${e(suggestion.teacher_email)}</p>${accepted?'<p class="sub">Puedes corregir la ficha pública. La coreografía privada del profesor se conserva.</p>':''}${editor}<label for="review-note">${accepted?'Comentario para el profesor (opcional)':'Motivo del descarte'}</label><textarea id="review-note" name="review_note" maxlength="2000" rows="3" ${accepted?'':'required'}></textarea>`,async values=>{
     const body={id:suggestion.id,decision,review_note:values.review_note};
-    if(accepted){const {review_note,...coreo}=values;coreo.id=c.id;for(const key of ['walls','counts'])if(coreo[key])coreo[key]=Number(coreo[key]);body.coreo=coreo;}
+    if(accepted){const level=resolveCoreoLevel(values,knownLevels);const {review_note,new_level,...coreo}=values;coreo.level=level;coreo.id=c.id;for(const key of ['walls','counts'])if(coreo[key])coreo[key]=Number(coreo[key]);body.coreo=coreo;}
     await cloudApi('review-suggestion',body);
     document.getElementById('modal').close();
     await cloudRefreshCoreoStates();await cloudRefreshNotifications();
     await cloudSuggestions();toast(accepted?'Coreografía publicada con la ficha revisada':'Propuesta descartada; el profesor verá el motivo');
   },accepted?'Confirmar publicación':'Confirmar descarte');
+  if(accepted)mountLevelEditor('review');
 }
 let cloudCoreoStates=null,cloudCoreoStatesBusy=false;
 const cloudStateLabels={private:'Privada',shared:'Compartida',imported:'Copiada del catálogo',pending:'Propuesta pendiente',accepted:'Propuesta publicada',rejected:'Propuesta descartada'};
@@ -413,17 +418,18 @@ document.addEventListener('click',event=>{
   const button=event.target.closest('[data-share-coreo]');
   if(button)cloudShareCoreo(button.dataset.shareCoreo);
 });
-function cloudShareCoreo(id){
+async function cloudShareCoreo(id){
   const source=db.coreos.find(c=>c.id===id);if(!source)return;
   const admin=cloudUser.role==='admin';
+  let sharedLibrary;
+  if(admin){try{sharedLibrary=await cloudApi('library');}catch(error){toast(error.message);return;}}
   cloudDialog(admin?'Compartir coreografía':'Sugerir coreografía',
-    `<p class="sub">${admin?'¿Quieres publicar esta coreografía en el catálogo común? Los profesores podrán copiarla a su espacio privado. Si ya estaba compartida, se actualizará y generará un nuevo aviso.':'¿Quieres sugerir esta coreografía para el catálogo común? El administrador verá tu nombre, correo y la ficha, y decidirá si la publica.'}</p><div class="suggestion-card"><h3>${cloudEscape(source.name)}</h3>${cloudSuggestionDetails(source)}</div>`,async()=>{
+    `<p class="sub">${admin?'¿Quieres publicar esta coreografía en el catálogo común? Los profesores podrán copiarla a su espacio privado. Si ya estaba compartida, se actualizará y generará un nuevo aviso.':'¿Quieres sugerir esta coreografía para el catálogo común? El administrador verá tu nombre, correo y la ficha, y decidirá si la publica.'}</p><div class="suggestion-card"><h3>${cloudEscape(source.name)}</h3>${cloudSuggestionDetails(source)}</div><div id="share-level-proposals"></div>`,async()=>{
       const current=db.coreos.find(c=>c.id===id);
       if(!current)throw new Error('Esta coreografía ya no está en tu lista.');
       if(admin){
-        const library=await cloudApi('library');
         const {libraryId,publicationVersion,...copy}=current;copy.id=libraryId||current.id;
-        await cloudApi('library',{version:library.version,coreos:[copy]});
+        await cloudApi('library',{version:sharedLibrary.version,coreos:resolveLevelTransfer([copy],cloudEl('share-level-proposals'),commonCoreoLevels(sharedLibrary.coreos))});
       }else{
         if(cloudFailure)throw new Error('Resuelve el error de guardado antes de enviar la propuesta.');
         if(cloudBusy)throw new Error('Espera a que termine el guardado antes de enviar la propuesta.');
@@ -436,4 +442,5 @@ function cloudShareCoreo(id){
       toast(admin?'Coreografía compartida en el catálogo común':'Propuesta enviada al administrador');
       await cloudRefreshNotifications();
     },admin?'Confirmar publicación':'Confirmar sugerencia');
+  if(admin)renderLevelTransfer(cloudEl('share-level-proposals'),[source],commonCoreoLevels(sharedLibrary.coreos),'el catálogo común');
 }

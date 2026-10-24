@@ -42,3 +42,5 @@
 [hidden]{display:none!important}@media(max-width:600px){.students-toolbar>label{flex:0 0 100%}.students-toolbar>label select{width:100%;max-width:none}}
 
 .center-photo{overflow:hidden}.center-photo>img{width:100%;height:100%;object-fit:cover;border-radius:inherit}.center-photo-editor{margin-top:16px}.center-photo-preview{display:grid;place-items:center;height:170px;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:#f4f0fa;color:#89909d;font-size:13px}.center-photo-preview img{width:100%;height:100%;object-fit:cover}.center-photo-editor .sub{font-size:12px;margin-top:12px}.center-photo-editor input[type=file]{max-width:100%}
+
+.level-transfer{padding:16px;margin-top:16px;border:1px solid #e5ddf5;border-radius:10px;background:#f5f1fc}.level-transfer h3{font-size:13px;margin-bottom:7px}.level-transfer .sub{font-size:12px}.level-transfer label{margin-top:13px}.level-transfer select{display:block;width:100%;margin-top:6px}[id$="-new-level-box"]{padding:12px 14px;background:#f5f1fc;border-radius:8px;margin-top:12px}[id$="-new-level-box"] label{margin-top:0}
