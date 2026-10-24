@@ -154,21 +154,22 @@ function createUser(string $email, string $name, string $password, string $role)
     return query('SELECT * FROM compas_users WHERE id=?',[$id])->fetch();
 }
 
-function libraryData(bool $includeUnpublished=false): array {
+function libraryData(bool $includeUnpublished=false, ?string $excludeOriginUser=null): array {
     $row=query('SELECT payload,version FROM compas_library WHERE id=1')->fetch();
     $coreos=json_decode($row['payload'],true,64,JSON_THROW_ON_ERROR);
     // Recover attribution for proposals accepted before provenance was stored in the catalog.
-    $missing=array_filter($coreos,fn($c)=>str_starts_with($c['id'],'suggestion_') && empty($c['originTeacherName']));
+    $missing=array_filter($coreos,fn($c)=>str_starts_with($c['id'],'suggestion_') && (empty($c['originTeacherName']) || empty($c['originTeacherId'])));
     if ($missing) {
         $origins=[];
         foreach (query("SELECT s.id,s.user_id,u.name FROM compas_suggestions s JOIN compas_users u ON u.id=s.user_id WHERE s.status='accepted'")->fetchAll() as $origin) $origins['suggestion_'.$origin['id']]=$origin;
-        foreach ($coreos as &$coreo) if (isset($origins[$coreo['id']]) && empty($coreo['originTeacherName'])) {
+        foreach ($coreos as &$coreo) if (isset($origins[$coreo['id']]) && (empty($coreo['originTeacherName']) || empty($coreo['originTeacherId']))) {
             $coreo['originTeacherName']=$origins[$coreo['id']]['name'];
             $coreo['originTeacherId']=$origins[$coreo['id']]['user_id'];
         }
         unset($coreo);
     }
     if (!$includeUnpublished) $coreos=array_values(array_filter($coreos,fn($c)=>($c['published'] ?? true)!==false));
+    if ($excludeOriginUser!==null) $coreos=array_values(array_filter($coreos,fn($c)=>($c['originTeacherId'] ?? null)!==$excludeOriginUser));
     return ['coreos'=>$coreos,'version'=>(int)$row['version']];
 }
 function unseenLibraryIds(string $userId, array $coreos): array {

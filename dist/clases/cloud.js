@@ -199,7 +199,7 @@ async function cloudLibrary(onlyNew=false,initialIds=[]){
   function visible(){return matchingRoutines(catalog,cloudEl('library-search').value).filter(c=>!cloudEl('library-new').checked||unseen.has(c.id));}
   function update(){
     const available=new Set(libraryCopies(catalog,catalog.map(c=>c.id),db.coreos).map(c=>c.libraryId));
-    target.innerHTML=visible().map(c=>`<div class="library-entry"><label class="share-option"><input type="checkbox" value="${cloudEscape(c.id)}" ${available.has(c.id)?'':'disabled'} ${selected.has(c.id)?'checked':''}><span>${cloudEscape(c.name)}${unseen.has(c.id)?' · NUEVA':''}<small>${cloudEscape(c.level)} · ${cloudEscape(c.counts||'Counts pendientes')}${available.has(c.id)?'':' · Ya está en tu lista'}</small></span></label>${unseen.has(c.id)?`<button type="button" class="text-button library-ignore" data-ignore="${cloudEscape(c.id)}" aria-label="Ignorar ${cloudEscape(c.name)}" ${ackBusy?'disabled':''}>Ignorar</button>`:''}</div>`).join('')||'<div class="empty">No hay coreografías con estos filtros.</div>';
+    target.innerHTML=visible().map(c=>`<div class="library-entry"><label class="share-option"><input type="checkbox" value="${cloudEscape(c.id)}" ${available.has(c.id)?'':'disabled'} ${selected.has(c.id)?'checked':''}><span>${cloudEscape(c.name)}${unseen.has(c.id)?' · NUEVA':''}<small>${cloudEscape(c.level)} · ${cloudEscape(c.counts||'Counts pendientes')}${available.has(c.id)?'':' · Ya está en tu lista'}</small>${cloudProvenanceMarkup(c)}</span></label>${unseen.has(c.id)?`<button type="button" class="text-button library-ignore" data-ignore="${cloudEscape(c.id)}" aria-label="Ignorar ${cloudEscape(c.name)}" ${ackBusy?'disabled':''}>Ignorar</button>`:''}</div>`).join('')||'<div class="empty">No hay coreografías con estos filtros.</div>';
     cloudEl('library-count').textContent=selected.size+' seleccionadas';submit.disabled=!selected.size||ackBusy;
     cloudEl('library-ignore-all').disabled=ackBusy||!visible().some(c=>unseen.has(c.id));
     cloudEl('library-seen').disabled=ackBusy||!unseen.size;
@@ -398,8 +398,8 @@ async function cloudReviewSuggestion(suggestion,decision){
 }
 let cloudCoreoStates=null,cloudCoreoStatesBusy=false,cloudCoreoOrigins={};
 function cloudProvenanceMarkup(c){
- const origin=cloudCoreoOrigins[c.id]||c;
- return `<small data-coreo-provenance="${cloudEscape(c.id)}">${origin.originTeacherName?'Propuesta por '+cloudEscape(origin.originTeacherName)+' · ':''}${origin.published===true?(origin.publishedById===cloudUser.id?'Publicada por ti':origin.publishedByName?'Publicada por '+cloudEscape(origin.publishedByName):'Publicada en el catálogo'):origin.published===false?'Sin compartir':''}</small>`;
+ const origin={...c,...cloudCoreoOrigins[c.id]};
+ return `<small data-coreo-provenance="${cloudEscape(c.id)}">${origin.originTeacherName?'Compartida por '+cloudEscape(origin.originTeacherName)+' · ':''}${origin.published===true?(origin.publishedById===cloudUser.id?'Publicada por ti':origin.publishedByName?'Publicada por '+cloudEscape(origin.publishedByName):'Publicada en el catálogo'):origin.published===false?'Sin compartir':''}</small>`;
 }
 const cloudStateLabels={approved:'Aceptada · sin publicar',private:'Privada',shared:'Compartida',imported:'Copiada del catálogo',pending:'Propuesta pendiente',accepted:'Propuesta aceptada',rejected:'Propuesta descartada'};
 function cloudCoreoStateMarkup(c){
@@ -411,7 +411,7 @@ async function cloudRefreshCoreoStates(){
   cloudCoreoStatesBusy=true;
   try{
     const result=await cloudApi('coreo-states');cloudCoreoStates=result.states;cloudCoreoOrigins=result.origins||{};
-    document.querySelectorAll('[data-coreo-provenance]').forEach(el=>{el.outerHTML=cloudProvenanceMarkup({id:el.dataset.coreoProvenance});});
+    document.querySelectorAll('[data-coreo-provenance]').forEach(el=>{const id=el.dataset.coreoProvenance;if(Object.hasOwn(result.states,id))el.outerHTML=cloudProvenanceMarkup(db.coreos.find(c=>c.id===id)||{id});});
     document.querySelectorAll('[data-coreo-state]').forEach(el=>{const state=cloudCoreoStates[el.dataset.coreoState]||'private';el.className='coreo-state '+state;el.textContent=cloudStateLabels[state]||'Privada';});
   }catch{
     document.querySelectorAll('[data-coreo-state]').forEach(el=>{el.className='coreo-state loading';el.textContent='Estado no disponible';});

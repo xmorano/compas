@@ -81,11 +81,11 @@ try {
         $u=query('SELECT * FROM compas_users WHERE id=?',[$u['id']])->fetch(); loginUser($u); reply(['csrf'=>$_SESSION['csrf'],'ok'=>true]);
     }
     if ($action==='library' && $method==='GET') {
-        $library=libraryData($u['role']==='admin');
+        $library=libraryData($u['role']==='admin',$u['role']==='admin' ? null : $u['id']);
         reply($library+['unseenIds'=>unseenLibraryIds($u['id'],$library['coreos'])]);
     }
     if ($action==='notifications' && $method==='GET') {
-        $library=libraryData();
+        $library=libraryData(false,$u['role']==='admin' ? null : $u['id']);
         $pending=$u['role']==='admin' ? (int)query("SELECT COUNT(*) FROM compas_suggestions WHERE status='pending' AND user_id<>?",[$u['id']])->fetchColumn() : 0;
         reply(['newCoreos'=>$u['role']==='admin' ? 0 : count(unseenLibraryIds($u['id'],$library['coreos'])),'pendingSuggestions'=>$pending]);
     }
@@ -98,7 +98,7 @@ try {
             if (!is_int($versions[$id] ?? 0) || ($versions[$id] ?? 0)<0) fail('Versión no válida.');
         }
         $available=[];
-        foreach (libraryData()['coreos'] as $c) $available[$c['id']]=(int)($c['publicationVersion'] ?? 0);
+        foreach (libraryData(false,$u['role']==='admin' ? null : $u['id'])['coreos'] as $c) $available[$c['id']]=(int)($c['publicationVersion'] ?? 0);
         $pdo->beginTransaction();
         foreach (array_unique($ids) as $id) if (isset($available[$id])) {
             // A stale screen can acknowledge only the publication it actually displayed.
